@@ -1,0 +1,1540 @@
+{
+  "schemaVersion": 1,
+  "mode": "static-snapshot",
+  "generatedAt": "2026-07-26T19:52:43.357+00:00",
+  "timezone": "Europe/Amsterdam",
+  "collector": {
+    "status": "stopped",
+    "runningRequests": 0,
+    "lastRunAt": "2026-07-26T15:11:33.119+00:00",
+    "freshnessSeconds": 16870,
+    "latestTile": "r06c08",
+    "latestItems": 125,
+    "latestError": null,
+    "targetCount": 48,
+    "intervalSeconds": 60
+  },
+  "current": {
+    "minute": {
+      "label": "2026-07-26T21:52+02:00",
+      "received": 0,
+      "unique": 0,
+      "new": 0,
+      "existing": 0,
+      "completedRuns": 0,
+      "failedRuns": 0,
+      "expectedRuns": 48,
+      "expectedRunsSoFar": 48,
+      "completionRate": 0.0,
+      "requestSuccessRate": 0.0,
+      "tilesSeen": 0,
+      "expectedTiles": 48,
+      "p95Seconds": null,
+      "paginationAnomalies": 0,
+      "outsideBBox": 0,
+      "distinctObservations": 0,
+      "distinctTracks": 0,
+      "detailsComplete": true
+    },
+    "hour": {
+      "label": "2026-07-26T21+02:00",
+      "received": 0,
+      "unique": 0,
+      "new": 0,
+      "existing": 0,
+      "completedRuns": 0,
+      "failedRuns": 0,
+      "expectedRuns": 2880,
+      "expectedRunsSoFar": 2880,
+      "completionRate": 0.0,
+      "requestSuccessRate": 0.0,
+      "tilesSeen": 0,
+      "expectedTiles": 48,
+      "p95Seconds": null,
+      "paginationAnomalies": 0,
+      "outsideBBox": 0,
+      "distinctObservations": 0,
+      "distinctTracks": 0,
+      "detailsComplete": true
+    },
+    "day": {
+      "label": "2026-07-26",
+      "received": 15476,
+      "unique": 14151,
+      "new": 11834,
+      "existing": 2317,
+      "completedRuns": 60,
+      "failedRuns": 1,
+      "expectedRuns": 69120,
+      "expectedRunsSoFar": 51491,
+      "completionRate": 0.00116525217999262,
+      "requestSuccessRate": 0.9836065573770492,
+      "tilesSeen": 48,
+      "expectedTiles": 48,
+      "p95Seconds": 5.454385999997612,
+      "paginationAnomalies": 17,
+      "outsideBBox": 798,
+      "distinctObservations": 11834,
+      "distinctTracks": 8327,
+      "detailsComplete": true
+    }
+  },
+  "timelines": {
+    "minute": [
+      {
+        "periodStart": "2026-07-26T18:53:00.000+00:00",
+        "label": "20:53",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T18:54:00.000+00:00",
+        "label": "20:54",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T18:55:00.000+00:00",
+        "label": "20:55",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T18:56:00.000+00:00",
+        "label": "20:56",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T18:57:00.000+00:00",
+        "label": "20:57",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T18:58:00.000+00:00",
+        "label": "20:58",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T18:59:00.000+00:00",
+        "label": "20:59",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:00:00.000+00:00",
+        "label": "21:00",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:01:00.000+00:00",
+        "label": "21:01",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:02:00.000+00:00",
+        "label": "21:02",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:03:00.000+00:00",
+        "label": "21:03",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:04:00.000+00:00",
+        "label": "21:04",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:05:00.000+00:00",
+        "label": "21:05",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:06:00.000+00:00",
+        "label": "21:06",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:07:00.000+00:00",
+        "label": "21:07",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:08:00.000+00:00",
+        "label": "21:08",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:09:00.000+00:00",
+        "label": "21:09",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:10:00.000+00:00",
+        "label": "21:10",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:11:00.000+00:00",
+        "label": "21:11",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:12:00.000+00:00",
+        "label": "21:12",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:13:00.000+00:00",
+        "label": "21:13",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:14:00.000+00:00",
+        "label": "21:14",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:15:00.000+00:00",
+        "label": "21:15",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:16:00.000+00:00",
+        "label": "21:16",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:17:00.000+00:00",
+        "label": "21:17",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:18:00.000+00:00",
+        "label": "21:18",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:19:00.000+00:00",
+        "label": "21:19",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:20:00.000+00:00",
+        "label": "21:20",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:21:00.000+00:00",
+        "label": "21:21",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:22:00.000+00:00",
+        "label": "21:22",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:23:00.000+00:00",
+        "label": "21:23",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:24:00.000+00:00",
+        "label": "21:24",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:25:00.000+00:00",
+        "label": "21:25",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:26:00.000+00:00",
+        "label": "21:26",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:27:00.000+00:00",
+        "label": "21:27",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:28:00.000+00:00",
+        "label": "21:28",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:29:00.000+00:00",
+        "label": "21:29",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:30:00.000+00:00",
+        "label": "21:30",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:31:00.000+00:00",
+        "label": "21:31",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:32:00.000+00:00",
+        "label": "21:32",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:33:00.000+00:00",
+        "label": "21:33",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:34:00.000+00:00",
+        "label": "21:34",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:35:00.000+00:00",
+        "label": "21:35",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:36:00.000+00:00",
+        "label": "21:36",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:37:00.000+00:00",
+        "label": "21:37",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:38:00.000+00:00",
+        "label": "21:38",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:39:00.000+00:00",
+        "label": "21:39",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:40:00.000+00:00",
+        "label": "21:40",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:41:00.000+00:00",
+        "label": "21:41",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:42:00.000+00:00",
+        "label": "21:42",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:43:00.000+00:00",
+        "label": "21:43",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:44:00.000+00:00",
+        "label": "21:44",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:45:00.000+00:00",
+        "label": "21:45",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:46:00.000+00:00",
+        "label": "21:46",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:47:00.000+00:00",
+        "label": "21:47",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:48:00.000+00:00",
+        "label": "21:48",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:49:00.000+00:00",
+        "label": "21:49",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:50:00.000+00:00",
+        "label": "21:50",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:51:00.000+00:00",
+        "label": "21:51",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:52:00.000+00:00",
+        "label": "21:52",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      }
+    ],
+    "hour": [
+      {
+        "periodStart": "2026-07-25T20:00:00.000+00:00",
+        "label": "25 22h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-25T21:00:00.000+00:00",
+        "label": "25 23h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-25T22:00:00.000+00:00",
+        "label": "26 00h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-25T23:00:00.000+00:00",
+        "label": "26 01h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T00:00:00.000+00:00",
+        "label": "26 02h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T01:00:00.000+00:00",
+        "label": "26 03h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T02:00:00.000+00:00",
+        "label": "26 04h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T03:00:00.000+00:00",
+        "label": "26 05h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T04:00:00.000+00:00",
+        "label": "26 06h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T05:00:00.000+00:00",
+        "label": "26 07h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T06:00:00.000+00:00",
+        "label": "26 08h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T07:00:00.000+00:00",
+        "label": "26 09h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T08:00:00.000+00:00",
+        "label": "26 10h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T09:00:00.000+00:00",
+        "label": "26 11h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T10:00:00.000+00:00",
+        "label": "26 12h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T11:00:00.000+00:00",
+        "label": "26 13h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T12:00:00.000+00:00",
+        "label": "26 14h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T13:00:00.000+00:00",
+        "label": "26 15h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T14:00:00.000+00:00",
+        "label": "26 16h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T15:00:00.000+00:00",
+        "label": "26 17h",
+        "received": 15476,
+        "new": 11834,
+        "completedRuns": 60,
+        "failedRuns": 1
+      },
+      {
+        "periodStart": "2026-07-26T16:00:00.000+00:00",
+        "label": "26 18h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T17:00:00.000+00:00",
+        "label": "26 19h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T18:00:00.000+00:00",
+        "label": "26 20h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T19:00:00.000+00:00",
+        "label": "26 21h",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      }
+    ],
+    "day": [
+      {
+        "periodStart": "2026-07-13T02:00:00.000+00:00",
+        "label": "07-13",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-14T02:00:00.000+00:00",
+        "label": "07-14",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-15T02:00:00.000+00:00",
+        "label": "07-15",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-16T02:00:00.000+00:00",
+        "label": "07-16",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-17T02:00:00.000+00:00",
+        "label": "07-17",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-18T02:00:00.000+00:00",
+        "label": "07-18",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-19T02:00:00.000+00:00",
+        "label": "07-19",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-20T02:00:00.000+00:00",
+        "label": "07-20",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-21T02:00:00.000+00:00",
+        "label": "07-21",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-22T02:00:00.000+00:00",
+        "label": "07-22",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-23T02:00:00.000+00:00",
+        "label": "07-23",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-24T02:00:00.000+00:00",
+        "label": "07-24",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-25T02:00:00.000+00:00",
+        "label": "07-25",
+        "received": 0,
+        "new": 0,
+        "completedRuns": 0,
+        "failedRuns": 0
+      },
+      {
+        "periodStart": "2026-07-26T02:00:00.000+00:00",
+        "label": "07-26",
+        "received": 15476,
+        "new": 11834,
+        "completedRuns": 60,
+        "failedRuns": 1
+      }
+    ]
+  },
+  "tiles": [
+    {
+      "tileId": "r01c01",
+      "row": 1,
+      "column": 1,
+      "status": "stale",
+      "received": 1192,
+      "completedRuns": 2,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:10:54.669+00:00",
+      "freshnessSeconds": 16908
+    },
+    {
+      "tileId": "r01c02",
+      "row": 1,
+      "column": 2,
+      "status": "stale",
+      "received": 873,
+      "completedRuns": 2,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:10:55.197+00:00",
+      "freshnessSeconds": 16908
+    },
+    {
+      "tileId": "r01c03",
+      "row": 1,
+      "column": 3,
+      "status": "stale",
+      "received": 410,
+      "completedRuns": 2,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:10:55.364+00:00",
+      "freshnessSeconds": 16907
+    },
+    {
+      "tileId": "r01c04",
+      "row": 1,
+      "column": 4,
+      "status": "stale",
+      "received": 439,
+      "completedRuns": 2,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:10:55.514+00:00",
+      "freshnessSeconds": 16907
+    },
+    {
+      "tileId": "r01c05",
+      "row": 1,
+      "column": 5,
+      "status": "stale",
+      "received": 90,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:10:55.617+00:00",
+      "freshnessSeconds": 16907
+    },
+    {
+      "tileId": "r01c06",
+      "row": 1,
+      "column": 6,
+      "status": "stale",
+      "received": 23,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:10:55.886+00:00",
+      "freshnessSeconds": 16907
+    },
+    {
+      "tileId": "r01c07",
+      "row": 1,
+      "column": 7,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:10:56.006+00:00",
+      "freshnessSeconds": 16907
+    },
+    {
+      "tileId": "r01c08",
+      "row": 1,
+      "column": 8,
+      "status": "stale",
+      "received": 100,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:10:56.076+00:00",
+      "freshnessSeconds": 16907
+    },
+    {
+      "tileId": "r02c01",
+      "row": 2,
+      "column": 1,
+      "status": "stale",
+      "received": 591,
+      "completedRuns": 2,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:10:56.249+00:00",
+      "freshnessSeconds": 16907
+    },
+    {
+      "tileId": "r02c02",
+      "row": 2,
+      "column": 2,
+      "status": "stale",
+      "received": 2856,
+      "completedRuns": 2,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:10:57.379+00:00",
+      "freshnessSeconds": 16905
+    },
+    {
+      "tileId": "r02c03",
+      "row": 2,
+      "column": 3,
+      "status": "stale",
+      "received": 794,
+      "completedRuns": 2,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:00.008+00:00",
+      "freshnessSeconds": 16903
+    },
+    {
+      "tileId": "r02c04",
+      "row": 2,
+      "column": 4,
+      "status": "stale",
+      "received": 24,
+      "completedRuns": 2,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:01.163+00:00",
+      "freshnessSeconds": 16902
+    },
+    {
+      "tileId": "r02c05",
+      "row": 2,
+      "column": 5,
+      "status": "stale",
+      "received": 25,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:01.251+00:00",
+      "freshnessSeconds": 16902
+    },
+    {
+      "tileId": "r02c06",
+      "row": 2,
+      "column": 6,
+      "status": "stale",
+      "received": 55,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:01.343+00:00",
+      "freshnessSeconds": 16902
+    },
+    {
+      "tileId": "r02c07",
+      "row": 2,
+      "column": 7,
+      "status": "stale",
+      "received": 241,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:01.475+00:00",
+      "freshnessSeconds": 16901
+    },
+    {
+      "tileId": "r02c08",
+      "row": 2,
+      "column": 8,
+      "status": "stale",
+      "received": 102,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:02.635+00:00",
+      "freshnessSeconds": 16900
+    },
+    {
+      "tileId": "r03c01",
+      "row": 3,
+      "column": 1,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 2,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:03.297+00:00",
+      "freshnessSeconds": 16900
+    },
+    {
+      "tileId": "r03c02",
+      "row": 3,
+      "column": 2,
+      "status": "stale",
+      "received": 970,
+      "completedRuns": 2,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:03.368+00:00",
+      "freshnessSeconds": 16899
+    },
+    {
+      "tileId": "r03c03",
+      "row": 3,
+      "column": 3,
+      "status": "stale",
+      "received": 1150,
+      "completedRuns": 1,
+      "failedRuns": 1,
+      "lastRunAt": "2026-07-26T15:11:06.128+00:00",
+      "freshnessSeconds": 16897
+    },
+    {
+      "tileId": "r03c04",
+      "row": 3,
+      "column": 4,
+      "status": "stale",
+      "received": 459,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:12.709+00:00",
+      "freshnessSeconds": 16890
+    },
+    {
+      "tileId": "r03c05",
+      "row": 3,
+      "column": 5,
+      "status": "stale",
+      "received": 237,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:14.817+00:00",
+      "freshnessSeconds": 16888
+    },
+    {
+      "tileId": "r03c06",
+      "row": 3,
+      "column": 6,
+      "status": "stale",
+      "received": 210,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:15.877+00:00",
+      "freshnessSeconds": 16887
+    },
+    {
+      "tileId": "r03c07",
+      "row": 3,
+      "column": 7,
+      "status": "stale",
+      "received": 2,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:16.990+00:00",
+      "freshnessSeconds": 16886
+    },
+    {
+      "tileId": "r03c08",
+      "row": 3,
+      "column": 8,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:17.054+00:00",
+      "freshnessSeconds": 16886
+    },
+    {
+      "tileId": "r04c01",
+      "row": 4,
+      "column": 1,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:17.127+00:00",
+      "freshnessSeconds": 16886
+    },
+    {
+      "tileId": "r04c02",
+      "row": 4,
+      "column": 2,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:17.190+00:00",
+      "freshnessSeconds": 16886
+    },
+    {
+      "tileId": "r04c03",
+      "row": 4,
+      "column": 3,
+      "status": "stale",
+      "received": 224,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:17.257+00:00",
+      "freshnessSeconds": 16886
+    },
+    {
+      "tileId": "r04c04",
+      "row": 4,
+      "column": 4,
+      "status": "stale",
+      "received": 1058,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:18.914+00:00",
+      "freshnessSeconds": 16884
+    },
+    {
+      "tileId": "r04c05",
+      "row": 4,
+      "column": 5,
+      "status": "stale",
+      "received": 212,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:24.486+00:00",
+      "freshnessSeconds": 16878
+    },
+    {
+      "tileId": "r04c06",
+      "row": 4,
+      "column": 6,
+      "status": "stale",
+      "received": 154,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:25.501+00:00",
+      "freshnessSeconds": 16877
+    },
+    {
+      "tileId": "r04c07",
+      "row": 4,
+      "column": 7,
+      "status": "stale",
+      "received": 2,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:26.170+00:00",
+      "freshnessSeconds": 16877
+    },
+    {
+      "tileId": "r04c08",
+      "row": 4,
+      "column": 8,
+      "status": "stale",
+      "received": 9,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:26.299+00:00",
+      "freshnessSeconds": 16877
+    },
+    {
+      "tileId": "r05c01",
+      "row": 5,
+      "column": 1,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:26.392+00:00",
+      "freshnessSeconds": 16876
+    },
+    {
+      "tileId": "r05c02",
+      "row": 5,
+      "column": 2,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:26.492+00:00",
+      "freshnessSeconds": 16876
+    },
+    {
+      "tileId": "r05c03",
+      "row": 5,
+      "column": 3,
+      "status": "stale",
+      "received": 55,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:26.550+00:00",
+      "freshnessSeconds": 16876
+    },
+    {
+      "tileId": "r05c04",
+      "row": 5,
+      "column": 4,
+      "status": "stale",
+      "received": 280,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:26.670+00:00",
+      "freshnessSeconds": 16876
+    },
+    {
+      "tileId": "r05c05",
+      "row": 5,
+      "column": 5,
+      "status": "stale",
+      "received": 538,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:27.916+00:00",
+      "freshnessSeconds": 16875
+    },
+    {
+      "tileId": "r05c06",
+      "row": 5,
+      "column": 6,
+      "status": "stale",
+      "received": 138,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:30.507+00:00",
+      "freshnessSeconds": 16872
+    },
+    {
+      "tileId": "r05c07",
+      "row": 5,
+      "column": 7,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:31.108+00:00",
+      "freshnessSeconds": 16872
+    },
+    {
+      "tileId": "r05c08",
+      "row": 5,
+      "column": 8,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:31.278+00:00",
+      "freshnessSeconds": 16872
+    },
+    {
+      "tileId": "r06c01",
+      "row": 6,
+      "column": 1,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:31.355+00:00",
+      "freshnessSeconds": 16872
+    },
+    {
+      "tileId": "r06c02",
+      "row": 6,
+      "column": 2,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:31.419+00:00",
+      "freshnessSeconds": 16871
+    },
+    {
+      "tileId": "r06c03",
+      "row": 6,
+      "column": 3,
+      "status": "stale",
+      "received": 0,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:31.598+00:00",
+      "freshnessSeconds": 16871
+    },
+    {
+      "tileId": "r06c04",
+      "row": 6,
+      "column": 4,
+      "status": "stale",
+      "received": 165,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:31.659+00:00",
+      "freshnessSeconds": 16871
+    },
+    {
+      "tileId": "r06c05",
+      "row": 6,
+      "column": 5,
+      "status": "stale",
+      "received": 34,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:32.299+00:00",
+      "freshnessSeconds": 16871
+    },
+    {
+      "tileId": "r06c06",
+      "row": 6,
+      "column": 6,
+      "status": "stale",
+      "received": 177,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:32.401+00:00",
+      "freshnessSeconds": 16870
+    },
+    {
+      "tileId": "r06c07",
+      "row": 6,
+      "column": 7,
+      "status": "stale",
+      "received": 54,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:33.010+00:00",
+      "freshnessSeconds": 16870
+    },
+    {
+      "tileId": "r06c08",
+      "row": 6,
+      "column": 8,
+      "status": "stale",
+      "received": 125,
+      "completedRuns": 1,
+      "failedRuns": 0,
+      "lastRunAt": "2026-07-26T15:11:33.119+00:00",
+      "freshnessSeconds": 16870
+    }
+  ],
+  "recentRuns": [
+    {
+      "startedAt": "2026-07-26T15:11:33.119+00:00",
+      "tileId": "r06c08",
+      "status": "completed",
+      "items": 125,
+      "new": 87,
+      "existing": 38,
+      "pages": 2,
+      "elapsedSeconds": 0.5692900000140071,
+      "error": null
+    },
+    {
+      "startedAt": "2026-07-26T15:11:33.010+00:00",
+      "tileId": "r06c07",
+      "status": "completed",
+      "items": 54,
+      "new": 54,
+      "existing": 0,
+      "pages": 1,
+      "elapsedSeconds": 0.08225220002350397,
+      "error": null
+    },
+    {
+      "startedAt": "2026-07-26T15:11:32.401+00:00",
+      "tileId": "r06c06",
+      "status": "completed",
+      "items": 177,
+      "new": 156,
+      "existing": 21,
+      "pages": 2,
+      "elapsedSeconds": 0.557097499986412,
+      "error": null
+    },
+    {
+      "startedAt": "2026-07-26T15:11:32.299+00:00",
+      "tileId": "r06c05",
+      "status": "completed",
+      "items": 34,
+      "new": 32,
+      "existing": 2,
+      "pages": 1,
+      "elapsedSeconds": 0.07440589999896474,
+      "error": null
+    },
+    {
+      "startedAt": "2026-07-26T15:11:31.659+00:00",
+      "tileId": "r06c04",
+      "status": "completed",
+      "items": 165,
+      "new": 121,
+      "existing": 44,
+      "pages": 2,
+      "elapsedSeconds": 0.5908475999895018,
+      "error": null
+    },
+    {
+      "startedAt": "2026-07-26T15:11:31.598+00:00",
+      "tileId": "r06c03",
+      "status": "completed",
+      "items": 0,
+      "new": 0,
+      "existing": 0,
+      "pages": 1,
+      "elapsedSeconds": 0.04146590002346784,
+      "error": null
+    },
+    {
+      "startedAt": "2026-07-26T15:11:31.419+00:00",
+      "tileId": "r06c02",
+      "status": "completed",
+      "items": 0,
+      "new": 0,
+      "existing": 0,
+      "pages": 1,
+      "elapsedSeconds": 0.15932279999833554,
+      "error": null
+    },
+    {
+      "startedAt": "2026-07-26T15:11:31.355+00:00",
+      "tileId": "r06c01",
+      "status": "completed",
+      "items": 0,
+      "new": 0,
+      "existing": 0,
+      "pages": 1,
+      "elapsedSeconds": 0.04670499998610467,
+      "error": null
+    },
+    {
+      "startedAt": "2026-07-26T15:11:31.278+00:00",
+      "tileId": "r05c08",
+      "status": "completed",
+      "items": 0,
+      "new": 0,
+      "existing": 0,
+      "pages": 1,
+      "elapsedSeconds": 0.06056040001567453,
+      "error": null
+    },
+    {
+      "startedAt": "2026-07-26T15:11:31.108+00:00",
+      "tileId": "r05c07",
+      "status": "completed",
+      "items": 0,
+      "new": 0,
+      "existing": 0,
+      "pages": 1,
+      "elapsedSeconds": 0.15393820000463165,
+      "error": null
+    },
+    {
+      "startedAt": "2026-07-26T15:11:30.507+00:00",
+      "tileId": "r05c06",
+      "status": "completed",
+      "items": 138,
+      "new": 124,
+      "existing": 14,
+      "pages": 2,
+      "elapsedSeconds": 0.5521215999906417,
+      "error": null
+    },
+    {
+      "startedAt": "2026-07-26T15:11:27.916+00:00",
+      "tileId": "r05c05",
+      "status": "completed",
+      "items": 538,
+      "new": 494,
+      "existing": 0,
+      "pages": 6,
+      "elapsedSeconds": 2.500230300007388,
+      "error": null
+    }
+  ],
+  "latestDailySummary": null,
+  "latestCompaction": null
+}

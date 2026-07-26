@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ship-analysis"
+version = "0.1.0"
+description = "Configurable Netherlands-wide AIS/track collection foundation"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [
+  { name = "ship_analysis project" }
+]
+dependencies = [
+  "tzdata>=2025.2",
+]
+
+[project.scripts]
+ship-analysis = "ship_analysis.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

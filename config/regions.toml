@@ -1,0 +1,57 @@
+[project]
+data_dir = "data"
+database = "data/ship_analysis.db"
+raw_dir = "data/raw"
+
+[provider]
+name = "euris_v2"
+base_url = "https://www.eurisportal.eu/visuris/api/TracksV2/GetTracksByBBoxV2"
+token_env = "EURIS_API_TOKEN"
+timeout_seconds = 60
+max_retries = 4
+max_pages = 200
+request_gap_seconds = 0.35
+user_agent = "ship-analysis/0.1 (EuRIS research collector)"
+
+[runner]
+idle_sleep_seconds = 1.0
+
+[compaction]
+enabled = true
+timezone = "Europe/Amsterdam"
+# An operational day runs from 04:00 local time to 04:00 the following day.
+# The compactor waits 15 minutes after the boundary before closing the day.
+day_boundary_hour = 4
+process_delay_minutes = 15
+stationary_radius_m = 30
+stationary_min_duration_minutes = 10
+stationary_min_samples = 5
+stationary_max_gap_minutes = 5
+
+[retention]
+enabled = true
+cleanup_interval_hours = 24
+# Raw snapshots, normalized observations/raw_json and provenance links are
+# staging data. They are deleted by completed operational day, never before
+# that day's position/stationary compaction succeeds.
+require_completed_compaction = true
+
+# Coverage interpretation:
+# This is the geographic bounding box of the European Netherlands plus a small
+# border margin. EuRIS supplies inland-waterway tracks available in this box;
+# it is not a raw coastal/offshore AIS radio feed.
+#
+# The 8x6 grid prevents one large response from becoming a single pagination
+# burst. Every tile is due once per minute; there are no overlapping priority
+# areas.
+[[areas]]
+id = "nl_coverage"
+label = "Netherlands national coverage"
+bbox = [3.20, 50.70, 7.30, 53.70]
+interval_seconds = 60
+grid_columns = 8
+grid_rows = 6
+start_delay_seconds = 0
+stagger_seconds = 0
+priority = 10
+enabled = true
