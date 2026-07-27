@@ -2,114 +2,123 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type RangeKey = "minute" | "hour" | "day";
-type Health = "healthy" | "warning" | "critical" | "no_data";
+type Severity = "info" | "warning" | "critical";
+type HealthStatus = "healthy" | "warning" | "critical" | "partial" | "no_data";
 
-type Period = {
-  label: string;
-  received: number;
-  unique: number;
-  new: number;
-  existing: number;
-  completedRuns: number;
-  failedRuns: number;
-  expectedRuns: number;
-  expectedRunsSoFar: number;
-  completionRate: number;
-  requestSuccessRate: number;
-  tilesSeen: number;
-  expectedTiles: number;
-  p95Seconds: number | null;
-  paginationAnomalies: number;
-  outsideBBox: number;
-  distinctObservations: number | null;
-  distinctTracks: number | null;
+type Reason = {
+  severity: Severity;
+  code: string;
+  message: string;
 };
 
-type TimelinePoint = {
+type Period = {
   periodStart: string;
-  label: string;
+  periodEnd?: string;
   received: number;
   new: number;
+  existing?: number;
+  observedRuns?: number;
   completedRuns: number;
   failedRuns: number;
+  runningRuns?: number;
+  expectedRuns?: number;
+  completionRate?: number;
+  requestSuccessRate?: number;
+  paginationChanges?: number;
+  averageSeconds?: number | null;
+  maxSeconds?: number | null;
+  label?: string;
 };
 
 type DashboardData = {
+  schemaVersion: number;
   mode: string;
   generatedAt: string;
   timezone: string;
+  health: {
+    status: HealthStatus;
+    headline: string;
+    hasAnomaly: boolean;
+    reasons: Reason[];
+  };
   collector: {
     status: "collecting" | "online" | "stopped" | "no_data";
     runningRequests: number;
     lastRunAt: string | null;
     freshnessSeconds: number | null;
+    observationWindowSeconds: number;
     latestTile: string | null;
     latestItems: number;
     latestError: string | null;
+    lastFailedAt: string | null;
+    lastFailedTile: string | null;
+    lastFailedError: string | null;
     targetCount: number;
     intervalSeconds: number;
   };
-  current: Record<RangeKey, Period>;
-  timelines: Record<RangeKey, TimelinePoint[]>;
-  tiles: Array<{
-    tileId: string;
-    row: number;
-    column: number;
-    status: "fresh" | "stale" | "failed" | "missing";
-    received: number;
-    completedRuns: number;
-    failedRuns: number;
-    lastRunAt: string | null;
-    freshnessSeconds: number | null;
-  }>;
-  recentRuns: Array<{
-    startedAt: string;
-    tileId: string;
-    status: string;
-    items: number;
-    new: number;
-    existing: number;
-    pages: number;
-    elapsedSeconds: number | null;
-    error: string | null;
-  }>;
+  volume: {
+    lastHour: Period;
+    operatingDay: Period;
+    hourly: Period[];
+  };
+  storage: {
+    dataBytes: number;
+    databaseBytes: number;
+    logicalDatabaseBytes: number;
+    walBytes: number;
+    rawBytes: number;
+    archiveBytes: number;
+    logBytes: number;
+    diskTotalBytes: number;
+    diskFreeBytes: number;
+    diskUsedPercent: number;
+    rawRetentionHours: number;
+    runDetailDays: number;
+  };
+  maintenance: {
+    lastCleanupAt: string | null;
+    compaction: {
+      operational_date: string;
+      status: string;
+      source_sample_count: number | null;
+      output_record_count: number | null;
+      completed_at_utc: string | null;
+      error: string | null;
+    } | null;
+  };
   latestDailySummary: {
     operationalDate: string;
     generatedAt: string;
-    healthStatus: Health;
-    summaryText: string;
-    findings: string[];
-  } | null;
-  latestCompaction: {
-    operational_date: string;
-    status: string;
-    source_sample_count: number | null;
-    output_record_count: number | null;
-    position_record_count: number | null;
-    stationary_record_count: number | null;
-    stationary_source_sample_count: number | null;
+    healthStatus: string;
+    received: number;
+    new: number;
+    activeMinutes: number;
+    expectedMinutes: number;
   } | null;
 };
 
-const ranges: Array<{ key: RangeKey; label: string; chartLabel: string }> = [
-  { key: "minute", label: "Minute", chartLabel: "Last 60 minutes" },
-  { key: "hour", label: "Hour", chartLabel: "Last 24 hours" },
-  { key: "day", label: "Ops day", chartLabel: "Last 14 operating days" },
-];
-
-const number = new Intl.NumberFormat("zh-CN");
-const percent = new Intl.NumberFormat("zh-CN", {
+const integer = new Intl.NumberFormat("en-US");
+const percent = new Intl.NumberFormat("en-US", {
   style: "percent",
   maximumFractionDigits: 1,
 });
 
+function formatBytes(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const index = Math.min(
+    units.length - 1,
+    Math.floor(Math.log(value) / Math.log(1024)),
+  );
+  return `${(value / 1024 ** index).toFixed(index >= 3 ? 1 : 0)} ${units[index]}`;
+}
+
 function formatTime(value: string | null, timezone: string) {
-  if (!value) return "Not available";
-  return new Intl.DateTimeFormat("zh-CN", {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("en-GB", {
     timeZone: timezone,
-    month: "2-digit",
     day: "2-digit",
+    month: "short",
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -118,7 +127,7 @@ function formatTime(value: string | null, timezone: string) {
 }
 
 function freshness(seconds: number | null) {
-  if (seconds === null) return "No collection yet";
+  if (seconds === null) return "No data";
   if (seconds < 60) return `${seconds}s ago`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   return `${Math.floor(seconds / 3600)}h ago`;
@@ -128,32 +137,32 @@ async function fetchDashboard(): Promise<DashboardData> {
   const local =
     typeof window !== "undefined" &&
     ["localhost", "127.0.0.1"].includes(window.location.hostname);
-  const candidates = local
-    ? [
-        "http://127.0.0.1:8765/api/dashboard",
-        "/dashboard-snapshot.json",
-      ]
-    : ["/dashboard-snapshot.json"];
-  let lastError: unknown;
+  const candidates = [
+    "/api/dashboard",
+    ...(local ? ["http://127.0.0.1:8765/api/dashboard"] : []),
+    "/dashboard-snapshot.json",
+  ];
+  let lastError: unknown = null;
   for (const url of candidates) {
     try {
       const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = (await response.json()) as DashboardData;
-      if (!payload.current || !payload.collector) {
-        throw new Error("Invalid dashboard payload");
+      if (payload.schemaVersion !== 2) {
+        throw new Error("Dashboard snapshot schema is out of date");
       }
       return payload;
     } catch (error) {
       lastError = error;
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("Unable to read dashboard data");
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Dashboard data is unavailable");
 }
 
 export function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [range, setRange] = useState<RangeKey>("minute");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -162,421 +171,275 @@ export function Dashboard() {
     try {
       const next = await fetchDashboard();
       setData(next);
-      setLastRefresh(new Date());
       setError(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to read dashboard data");
+      setLastRefresh(new Date());
+    } catch (refreshError) {
+      setError(
+        refreshError instanceof Error
+          ? refreshError.message
+          : "Dashboard data is unavailable",
+      );
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void refresh();
+    const initial = window.setTimeout(() => void refresh(), 0);
     const timer = window.setInterval(() => void refresh(), 30_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
   }, [refresh]);
 
-  const timeline = data?.timelines[range] ?? [];
-  const current = data?.current[range];
-  const maxReceived = useMemo(
-    () => Math.max(1, ...timeline.map((point) => point.received)),
-    [timeline],
-  );
-  const maxTile = useMemo(
-    () => Math.max(1, ...(data?.tiles.map((tile) => tile.received) ?? [1])),
+  const peak = useMemo(
+    () => Math.max(1, ...(data?.volume.hourly.map((row) => row.received) ?? [1])),
     [data],
   );
 
   if (loading && !data) {
     return (
-      <main className="loading-shell" aria-label="Loading AIS statistics">
-        <div className="loading-mark" />
-        <p>Connecting to the Netherlands AIS pulse…</p>
+      <main className="state-shell">
+        <div className="state-pulse" />
+        <h1>Loading AIS collection health</h1>
+        <p>Reading the latest aggregate status.</p>
       </main>
     );
   }
 
-  if (!data || !current) {
+  if (!data) {
     return (
-      <main className="error-shell">
-        <p className="eyebrow">AIS MONITOR</p>
+      <main className="state-shell state-error">
+        <span>!</span>
         <h1>Dashboard connection unavailable</h1>
         <p>{error ?? "Start the local dashboard API and try again."}</p>
         <button type="button" onClick={() => void refresh()}>
-          Reconnect
+          Retry
         </button>
       </main>
     );
   }
 
-  const statusLabel = {
-    collecting: "Collecting",
-    online: "Online",
-    stopped: "Collection stopped",
+  const healthLabel = {
+    healthy: "Healthy",
+    warning: "Warning",
+    critical: "Critical",
+    partial: "Starting",
     no_data: "No data",
-  }[data.collector.status];
-  const isLive = data.mode === "live-local";
-  const rangeMeta = ranges.find((item) => item.key === range) ?? ranges[0];
+  }[data.health.status];
+  const compaction = data.maintenance.compaction;
+  const scheduleBaselineReady =
+    data.collector.observationWindowSeconds >= 3600;
 
   return (
     <main className="dashboard">
       <header className="topbar">
-        <div className="brand">
-          <div className="brand-mark" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </div>
-          <div>
-            <p className="eyebrow">NETHERLANDS · AIS NETWORK</p>
-            <h1>Netherlands AIS Pulse</h1>
-          </div>
+        <div>
+          <p className="eyebrow">NETHERLANDS AIS COLLECTION</p>
+          <h1>AIS Collection Health</h1>
         </div>
         <div className="topbar-actions">
-          <div className={`live-pill status-${data.collector.status}`}>
-            <i aria-hidden="true" />
-            {statusLabel}
-          </div>
-          <button
-            className="refresh-button"
-            type="button"
-            onClick={() => void refresh()}
-            aria-label="Refresh dashboard data"
-          >
-            ↻ Refresh
+          <span className={`health-pill health-${data.health.status}`}>
+            <i />
+            {healthLabel}
+          </span>
+          <button type="button" onClick={() => void refresh()}>
+            Refresh
           </button>
         </div>
       </header>
 
-      <section className="hero">
-        <div>
-          <p className="hero-kicker">
-            {isLive ? "Local live data" : "Secure aggregate snapshot"} · 48 national grids · 60s cadence
-          </p>
-          <h2>
-            From every request,
-            <br />
-            see the national waterways<span>come alive.</span>
-          </h2>
-        </div>
-        <div className="hero-meta">
-          <div>
-            <small>Latest collection</small>
-            <strong>{freshness(data.collector.freshnessSeconds)}</strong>
-            <span>
-              {data.collector.latestTile ?? "—"} ·{" "}
-              {number.format(data.collector.latestItems)} items
-            </span>
-          </div>
-          <div>
-            <small>Dashboard refresh</small>
-            <strong>
-              {lastRefresh
-                ? lastRefresh.toLocaleTimeString("zh-CN", { hour12: false })
-                : "—"}
-            </strong>
-            <span>Auto-refreshes every 30 seconds</span>
-          </div>
-        </div>
-      </section>
-
       {error && (
-        <div className="notice" role="status">
-          Live API unavailable; showing the last successful payload: {error}
-        </div>
-      )}
-      {!isLive && (
-        <div className="notice snapshot-notice">
-          This is a build-time snapshot. Open the local dashboard for live SQLite statistics.
+        <div className="notice">
+          Live API unavailable; showing the last successful snapshot. {error}
         </div>
       )}
 
-      <nav className="range-switch" aria-label="Metric time range">
-        {ranges.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            className={range === item.key ? "active" : ""}
-            onClick={() => setRange(item.key)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      <section className={`health-summary health-${data.health.status}`}>
+        <div>
+          <p>System status</p>
+          <h2>{data.health.headline}</h2>
+          <span>
+            Last collection {freshness(data.collector.freshnessSeconds)} ·{" "}
+            {data.collector.latestTile ?? "no grid"}
+          </span>
+        </div>
+        <dl>
+          <div>
+            <dt>Collection cadence</dt>
+            <dd>{data.collector.intervalSeconds}s</dd>
+          </div>
+          <div>
+            <dt>National grids</dt>
+            <dd>{data.collector.targetCount}</dd>
+          </div>
+          <div>
+            <dt>Last refresh</dt>
+            <dd>
+              {lastRefresh
+                ? lastRefresh.toLocaleTimeString("en-GB", { hour12: false })
+                : "—"}
+            </dd>
+          </div>
+        </dl>
+      </section>
 
       <section className="metric-grid" aria-label="Key collection metrics">
         <MetricCard
-          label={`${rangeMeta.label} API items`}
-          value={current.received}
-          suffix="items"
-          detail={`${number.format(current.completedRuns)} successful requests`}
-          tone="cyan"
+          label="Operating-day API items"
+          value={integer.format(data.volume.operatingDay.received)}
+          detail={`${integer.format(data.volume.operatingDay.new)} new observations`}
         />
         <MetricCard
-          label="New observations"
-          value={current.new}
-          suffix="items"
-          detail={`${number.format(current.existing)} repeated observations`}
-          tone="lime"
+          label="Last-hour new observations"
+          value={integer.format(data.volume.lastHour.new)}
+          detail={`${integer.format(data.volume.lastHour.received)} API items received`}
         />
         <MetricCard
-          label="Schedule completion"
-          value={percent.format(current.completionRate)}
-          detail={`${number.format(current.completedRuns)} / ${number.format(
-            current.expectedRunsSoFar,
-          )} requests`}
-          tone={current.completionRate >= 0.98 ? "lime" : "amber"}
-        />
-        <MetricCard
-          label="Request success"
-          value={percent.format(current.requestSuccessRate)}
-          detail={`${number.format(current.failedRuns)} failed requests`}
-          tone={current.failedRuns === 0 ? "cyan" : "amber"}
-        />
-        <MetricCard
-          label="Grid coverage"
-          value={`${current.tilesSeen}/${current.expectedTiles}`}
-          detail={`${data.collector.intervalSeconds}s collection cadence`}
-          tone="neutral"
-        />
-        <MetricCard
-          label="P95 request time"
+          label="Last-hour completion"
           value={
-            current.p95Seconds === null
-              ? "—"
-              : `${current.p95Seconds.toFixed(2)}`
+            scheduleBaselineReady
+              ? percent.format(data.volume.lastHour.completionRate ?? 0)
+              : "Warming up"
           }
-          suffix={current.p95Seconds === null ? "" : "s"}
-          detail={`${number.format(current.paginationAnomalies)} pagination anomalies`}
-          tone="neutral"
+          detail={
+            scheduleBaselineReady
+              ? `${integer.format(data.volume.lastHour.failedRuns)} failed requests`
+              : `${integer.format(data.volume.lastHour.completedRuns)} requests completed`
+          }
+          tone={
+            !scheduleBaselineReady
+              ? undefined
+              : (data.volume.lastHour.completionRate ?? 0) >= 0.98
+              ? "good"
+              : "warning"
+          }
+        />
+        <MetricCard
+          label="Disk space remaining"
+          value={formatBytes(data.storage.diskFreeBytes)}
+          detail={`${percent.format(data.storage.diskUsedPercent)} of disk used`}
+          tone={data.storage.diskUsedPercent < 0.8 ? "good" : "warning"}
+        />
+        <MetricCard
+          label="Collection data on disk"
+          value={formatBytes(data.storage.dataBytes)}
+          detail={`${formatBytes(data.storage.rawBytes)} raw · ${data.storage.rawRetentionHours}h retention`}
+        />
+        <MetricCard
+          label="SQLite WAL"
+          value={formatBytes(data.storage.walBytes)}
+          detail={`${formatBytes(data.storage.logicalDatabaseBytes)} logical database`}
+          tone={
+            data.storage.walBytes >
+            Math.max(1024 ** 3, data.storage.logicalDatabaseBytes * 2)
+              ? "warning"
+              : "good"
+          }
         />
       </section>
 
       <section className="content-grid">
-        <article className="panel throughput-panel">
+        <article className="panel trend-panel">
           <PanelHeader
-            eyebrow="THROUGHPUT"
-            title={rangeMeta.chartLabel}
-            meta={`Peak ${number.format(maxReceived)} items`}
+            eyebrow="VOLUME"
+            title="API items received · last 24 hours"
+            meta={`Peak ${integer.format(peak)}`}
           />
-          <div className="bar-chart" role="img" aria-label="Collection throughput trend">
-            {timeline.map((point, index) => {
-              const height = Math.max(2, (point.received / maxReceived) * 100);
-              const showLabel =
-                timeline.length <= 14 ||
-                index === 0 ||
-                index === timeline.length - 1 ||
-                index % Math.ceil(timeline.length / 6) === 0;
-              return (
-                <div className="bar-slot" key={point.periodStart}>
-                  <div
-                    className={`bar ${point.failedRuns ? "bar-alert" : ""}`}
-                    style={{ height: `${height}%` }}
-                    title={`${point.label}: ${number.format(
-                      point.received,
-                    )} items, ${number.format(point.new)} new`}
-                  >
-                    <span />
+          <div className="bar-chart" aria-label="Hourly collection volume">
+            {data.volume.hourly.map((row, index) => (
+              <div className="bar-slot" key={row.periodStart}>
+                <div
+                  className={`bar ${row.failedRuns ? "bar-alert" : ""}`}
+                  style={{
+                    height: `${Math.max(2, (row.received / peak) * 100)}%`,
+                  }}
+                  title={`${row.label}: ${integer.format(row.received)} items; ${integer.format(row.new)} new`}
+                />
+                <small>
+                  {index % 4 === 0 || index === data.volume.hourly.length - 1
+                    ? row.label
+                    : ""}
+                </small>
+              </div>
+            ))}
+          </div>
+          <div className="legend">
+            <span><i className="legend-main" />API items</span>
+            <span><i className="legend-alert" />Hour with failures</span>
+          </div>
+        </article>
+
+        <article className="panel anomaly-panel">
+          <PanelHeader
+            eyebrow="ANOMALY CHECK"
+            title={data.health.hasAnomaly ? "Items to investigate" : "No active anomaly"}
+            meta={healthLabel}
+          />
+          {data.health.reasons.length ? (
+            <ul className="reason-list">
+              {data.health.reasons.map((reason) => (
+                <li className={`reason-${reason.severity}`} key={reason.code}>
+                  <i />
+                  <div>
+                    <strong>{reason.code.replaceAll("_", " ")}</strong>
+                    <span>{reason.message}</span>
                   </div>
-                  <small>{showLabel ? point.label : ""}</small>
-                </div>
-              );
-            })}
-          </div>
-          <div className="chart-legend">
-            <span><i className="legend-cyan" />API items returned</span>
-            <span><i className="legend-amber" />Period with failures</span>
-          </div>
-        </article>
-
-        <article className="panel pulse-panel">
-          <PanelHeader
-            eyebrow="LIVE PULSE"
-            title="Live collection status"
-            meta={formatTime(data.generatedAt, data.timezone)}
-          />
-          <div className="pulse-orbit">
-            <div className={`pulse-core status-${data.collector.status}`}>
-              <span>{data.collector.runningRequests || 48}</span>
-              <small>national grids</small>
-            </div>
-          </div>
-          <dl className="pulse-stats">
-            <div>
-              <dt>This minute</dt>
-              <dd>{number.format(data.current.minute.received)}</dd>
-            </div>
-            <div>
-              <dt>This hour</dt>
-              <dd>{number.format(data.current.hour.received)}</dd>
-            </div>
-            <div>
-              <dt>This operating day</dt>
-              <dd>{number.format(data.current.day.received)}</dd>
-            </div>
-          </dl>
-        </article>
-      </section>
-
-      <section className="content-grid lower-grid">
-        <article className="panel tile-panel">
-          <PanelHeader
-            eyebrow="NATIONAL COVERAGE"
-            title="8 × 6 national grid heat"
-            meta={`${data.tiles.filter((tile) => tile.status === "fresh").length} fresh grids`}
-          />
-          <div className="tile-layout">
-            <div className="tile-grid" aria-label="48 Netherlands collection grids">
-              {data.tiles.map((tile) => {
-                const intensity = Math.max(0.08, tile.received / maxTile);
-                return (
-                  <div
-                    className={`tile tile-${tile.status}`}
-                    key={tile.tileId}
-                    style={{ "--heat": intensity } as React.CSSProperties}
-                    title={`${tile.tileId}: ${number.format(
-                      tile.received,
-                    )} items, ${tile.completedRuns} successful requests`}
-                  >
-                    <span>{tile.tileId.replace("r", "").replace("c", "·")}</span>
-                    <strong>{number.format(tile.received)}</strong>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="tile-legend">
-              <span><i className="tile-fresh-dot" />Updated within 120s</span>
-              <span><i className="tile-stale-dot" />Historical data</span>
-              <span><i className="tile-failed-dot" />Latest request failed</span>
-              <span><i className="tile-missing-dot" />No data</span>
-              <p>Brightness represents API items returned during the operating day.</p>
-            </div>
-          </div>
-        </article>
-
-        <article className="panel summary-panel">
-          <PanelHeader
-            eyebrow="DAILY ASSESSMENT"
-            title="Daily collection summary"
-            meta="04:00 close"
-          />
-          {data.latestDailySummary ? (
-            <>
-              <div
-                className={`health-badge health-${data.latestDailySummary.healthStatus}`}
-              >
-                <span>{data.latestDailySummary.operationalDate}</span>
-                <strong>
-                  {
-                    {
-                      healthy: "Healthy",
-                      warning: "Needs attention",
-                      critical: "Critical",
-                      no_data: "No data",
-                    }[data.latestDailySummary.healthStatus]
-                  }
-                </strong>
-              </div>
-              <ul className="finding-list">
-                {data.latestDailySummary.findings.slice(0, 5).map((finding) => (
-                  <li key={finding}>{finding}</li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <div className="empty-summary">
-              <span>04:15</span>
-              <h3>First operating-day report is pending</h3>
-              <p>
-                After the operating day closes, the system evaluates schedule completion, failed requests, pagination anomalies and stationary compaction.
-              </p>
-            </div>
-          )}
-          {data.latestCompaction && (
-            <div className="compaction-strip">
-              <div>
-                <small>Position records</small>
-                <strong>
-                  {number.format(data.latestCompaction.position_record_count ?? 0)}
-                </strong>
-              </div>
-              <div>
-                <small>Stationary segments</small>
-                <strong>
-                  {number.format(
-                    data.latestCompaction.stationary_record_count ?? 0,
-                  )}
-                </strong>
-              </div>
-              <div>
-                <small>Compacted samples</small>
-                <strong>
-                  {number.format(
-                    data.latestCompaction.stationary_source_sample_count ?? 0,
-                  )}
-                </strong>
-              </div>
-            </div>
-          )}
-        </article>
-      </section>
-
-      <section className="panel runs-panel">
-        <PanelHeader
-          eyebrow="REQUEST AUDIT"
-          title="Recent collection runs"
-          meta={`Data time ${formatTime(data.generatedAt, data.timezone)}`}
-        />
-        <div className="run-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Local time</th>
-                <th>Grid</th>
-                <th>Status</th>
-                <th>Items</th>
-                <th>New</th>
-                <th>Existing</th>
-                <th>Pages</th>
-                <th>Elapsed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.recentRuns.map((run) => (
-                <tr key={`${run.startedAt}-${run.tileId}`}>
-                  <td>{formatTime(run.startedAt, data.timezone)}</td>
-                  <td><code>{run.tileId}</code></td>
-                  <td>
-                    <span className={`run-status run-${run.status}`}>
-                      {run.status === "completed"
-                        ? "Success"
-                        : run.status === "failed"
-                          ? "Failed"
-                          : "Running"}
-                    </span>
-                  </td>
-                  <td>{number.format(run.items)}</td>
-                  <td>{number.format(run.new)}</td>
-                  <td>{number.format(run.existing)}</td>
-                  <td>{run.pages || "—"}</td>
-                  <td>
-                    {run.elapsedSeconds === null
-                      ? "—"
-                      : `${run.elapsedSeconds.toFixed(2)} s`}
-                  </td>
-                </tr>
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
+          ) : (
+            <div className="all-clear">
+              <span>✓</span>
+              <div>
+                <strong>All monitored checks passed</strong>
+                <p>Collection freshness, requests, disk and maintenance are within limits.</p>
+              </div>
+            </div>
+          )}
+        </article>
+      </section>
+
+      <section className="panel maintenance-panel">
+        <PanelHeader
+          eyebrow="STORAGE & MAINTENANCE"
+          title="Daily processing"
+          meta={`Generated ${formatTime(data.generatedAt, data.timezone)}`}
+        />
+        <div className="maintenance-grid">
+          <MaintenanceItem
+            label="Latest compaction"
+            value={compaction?.status ?? "Pending"}
+            detail={
+              compaction
+                ? `${compaction.operational_date} · ${integer.format(compaction.output_record_count ?? 0)} records`
+                : "No completed operating day yet"
+            }
+          />
+          <MaintenanceItem
+            label="Last staging cleanup"
+            value={formatTime(data.maintenance.lastCleanupAt, data.timezone)}
+            detail={`${data.storage.rawRetentionHours}h raw retention · ${data.storage.runDetailDays}d request details`}
+          />
+          <MaintenanceItem
+            label="Compressed archive"
+            value={formatBytes(data.storage.archiveBytes)}
+            detail="Daily gzip archive retained"
+          />
+          <MaintenanceItem
+            label="Database files"
+            value={formatBytes(
+              data.storage.databaseBytes + data.storage.walBytes,
+            )}
+            detail={`${formatBytes(data.storage.logBytes)} rotating logs`}
+          />
         </div>
       </section>
 
       <footer>
-        <p>
-          EuRIS Tracks · Europe/Amsterdam · Operating day 04:00–04:00
-        </p>
-        <p>Aggregate statistics only — no token or vessel identity details.</p>
+        <span>Aggregate operational metrics only</span>
+        <span>EuRIS Tracks · Europe/Amsterdam · 04:00 operating day</span>
       </footer>
     </main>
   );
@@ -585,23 +448,18 @@ export function Dashboard() {
 function MetricCard({
   label,
   value,
-  suffix,
   detail,
-  tone,
+  tone = "neutral",
 }: {
   label: string;
-  value: string | number;
-  suffix?: string;
+  value: string;
   detail: string;
-  tone: "cyan" | "lime" | "amber" | "neutral";
+  tone?: "neutral" | "good" | "warning";
 }) {
   return (
     <article className={`metric-card metric-${tone}`}>
       <p>{label}</p>
-      <strong>
-        {typeof value === "number" ? number.format(value) : value}
-        {suffix && <small>{suffix}</small>}
-      </strong>
+      <strong>{value}</strong>
       <span>{detail}</span>
     </article>
   );
@@ -624,5 +482,23 @@ function PanelHeader({
       </div>
       <span>{meta}</span>
     </header>
+  );
+}
+
+function MaintenanceItem({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="maintenance-item">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
   );
 }

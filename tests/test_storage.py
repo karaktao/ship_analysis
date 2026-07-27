@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 
@@ -9,6 +10,61 @@ from ship_analysis.storage import Storage
 
 
 class StorageTests(unittest.TestCase):
+    def test_initialize_migrates_daily_summary_health_check(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "test.db"
+            with sqlite3.connect(database) as connection:
+                connection.execute(
+                    """
+                    CREATE TABLE daily_collection_summaries (
+                        operational_date TEXT PRIMARY KEY,
+                        timezone TEXT NOT NULL,
+                        day_start_utc TEXT NOT NULL,
+                        day_end_utc TEXT NOT NULL,
+                        generated_at_utc TEXT NOT NULL,
+                        health_status TEXT NOT NULL CHECK (
+                            health_status IN (
+                                'healthy', 'warning', 'critical', 'no_data'
+                            )
+                        ),
+                        summary_text TEXT NOT NULL,
+                        summary_json TEXT NOT NULL,
+                        output_path TEXT NOT NULL
+                    )
+                    """
+                )
+                connection.execute(
+                    """
+                    INSERT INTO daily_collection_summaries
+                    VALUES (
+                        '2026-07-26', 'Europe/Amsterdam', 'start', 'end',
+                        'generated', 'critical', 'summary', '{}', 'output'
+                    )
+                    """
+                )
+            connection.close()
+
+            storage = Storage(database, root / "raw")
+            storage.initialize()
+            with storage.connect() as connection:
+                sql = connection.execute(
+                    """
+                    SELECT sql FROM sqlite_master
+                    WHERE type = 'table'
+                      AND name = 'daily_collection_summaries'
+                    """
+                ).fetchone()[0]
+                preserved = connection.execute(
+                    """
+                    SELECT health_status
+                    FROM daily_collection_summaries
+                    WHERE operational_date = '2026-07-26'
+                    """
+                ).fetchone()[0]
+            self.assertIn("'partial'", sql)
+            self.assertEqual("critical", preserved)
+
     def test_ingest_deduplicates_overlapping_area_observations(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -56,6 +112,9 @@ class StorageTests(unittest.TestCase):
             )
             self.assertEqual(1, storage.counts()["observations"])
             with storage.connect() as connection:
+                raw_json = connection.execute(
+                    "SELECT raw_json FROM observations"
+                ).fetchone()[0]
                 inside = connection.execute(
                     """
                     SELECT inside_requested_bbox
@@ -64,6 +123,7 @@ class StorageTests(unittest.TestCase):
                     """,
                     (first_run,),
                 ).fetchone()[0]
+            self.assertEqual("", raw_json)
             self.assertEqual(1, inside)
             aggregate = storage.aggregate_runs([first_run, second_run], target.bbox)
             self.assertEqual(1, aggregate["distinct_observations"])

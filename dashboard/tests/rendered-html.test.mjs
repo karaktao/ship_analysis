@@ -23,15 +23,15 @@ async function render() {
   );
 }
 
-test("server-renders the English AIS dashboard shell", async () => {
+test("server-renders the simplified English AIS health shell", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>Netherlands AIS Pulse<\/title>/i);
-  assert.match(html, /Loading AIS statistics/);
-  assert.match(html, /Netherlands AIS Pulse/);
+  assert.match(html, /<title>AIS Collection Health<\/title>/i);
+  assert.match(html, /Loading AIS collection health/);
+  assert.match(html, /AIS Collection Health/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Building your site/i);
   assert.doesNotMatch(html, /[\u4e00-\u9fff]/);
 });
@@ -43,8 +43,8 @@ test("starter preview files and dependency are removed", async () => {
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
-  assert.match(page, /Netherlands AIS Pulse/);
-  assert.match(layout, /Netherlands AIS Pulse/);
+  assert.match(page, /AIS Collection Health/);
+  assert.match(layout, /AIS Collection Health/);
   assert.doesNotMatch(page, /_sites-preview|SkeletonPreview|codex-preview/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(

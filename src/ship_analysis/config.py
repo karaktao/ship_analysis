@@ -74,6 +74,9 @@ class RetentionConfig:
     enabled: bool
     cleanup_interval_hours: int
     require_completed_compaction: bool
+    raw_min_age_hours: int = 24
+    run_detail_days: int = 14
+    delete_batch_size: int = 25_000
 
 
 @dataclass(frozen=True)
@@ -199,6 +202,15 @@ def load_config(path: str | Path = "config/regions.toml") -> AppConfig:
     cleanup_interval_hours = int(retention.get("cleanup_interval_hours", 24))
     if cleanup_interval_hours < 1:
         raise ValueError("retention.cleanup_interval_hours must be at least 1")
+    raw_min_age_hours = int(retention.get("raw_min_age_hours", 24))
+    run_detail_days = int(retention.get("run_detail_days", 14))
+    delete_batch_size = int(retention.get("delete_batch_size", 25_000))
+    if raw_min_age_hours < 24:
+        raise ValueError("retention.raw_min_age_hours must be at least 24")
+    if run_detail_days < 1:
+        raise ValueError("retention.run_detail_days must be at least 1")
+    if delete_batch_size < 1_000:
+        raise ValueError("retention.delete_batch_size must be at least 1000")
 
     return AppConfig(
         config_path=config_path,
@@ -232,6 +244,9 @@ def load_config(path: str | Path = "config/regions.toml") -> AppConfig:
             require_completed_compaction=bool(
                 retention.get("require_completed_compaction", True)
             ),
+            raw_min_age_hours=raw_min_age_hours,
+            run_detail_days=run_detail_days,
+            delete_batch_size=delete_batch_size,
         ),
         idle_sleep_seconds=float(runner.get("idle_sleep_seconds", 1.0)),
         areas=tuple(areas),

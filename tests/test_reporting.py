@@ -135,6 +135,7 @@ class ReportingTests(unittest.TestCase):
             self.assertEqual(9, stats.new_observation_count)
             self.assertEqual(5, stats.existing_observation_count)
             self.assertEqual(1, stats.within_run_duplicate_count)
+            self.assertEqual(0, stats.pagination_anomaly_run_count)
             self.assertAlmostEqual(0.4, stats.p95_elapsed_seconds or 0)
             self.assertEqual(
                 stats.period_start_utc,
@@ -171,7 +172,7 @@ class ReportingTests(unittest.TestCase):
                 allow_incomplete=True,
             )
 
-            self.assertEqual("critical", summary.health_status)
+            self.assertEqual("partial", summary.health_status)
             self.assertEqual(
                 72_000,
                 summary.metrics["collection"]["expected_run_count"],
@@ -190,6 +191,7 @@ class ReportingTests(unittest.TestCase):
             payload = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual("2026-10-24", payload["operational_date"])
             self.assertIn("完成 1/72,000", summary.summary_text)
+            self.assertTrue(summary.metrics["coverage"]["is_partial"])
             with storage.connect() as connection:
                 count = connection.execute(
                     "SELECT COUNT(*) FROM daily_collection_summaries"

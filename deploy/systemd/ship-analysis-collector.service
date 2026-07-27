@@ -1,0 +1,26 @@
+[Unit]
+Description=Ship Analysis EuRIS collector
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=shipanalysis
+Group=shipanalysis
+WorkingDirectory=/opt/ship_analysis/app
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/ship-analysis/collector.env
+ExecStart=/opt/ship_analysis/app/.venv/bin/ship-analysis --config /opt/ship_analysis/app/config/regions.toml run
+Restart=always
+RestartSec=15
+TimeoutStopSec=120
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ship_analysis/app/data
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

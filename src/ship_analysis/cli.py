@@ -349,11 +349,14 @@ def main(argv: list[str] | None = None) -> int:
                 f"through={outcome.eligible_through_operational_date} "
                 f"runs={outcome.candidate_runs} raw={outcome.raw_deleted} "
                 f"missing={outcome.raw_missing} "
+                f"raw_too_new={outcome.skipped_raw_too_new} "
                 f"links={outcome.provenance_links_deleted} "
                 f"observations={outcome.observations_deleted} "
+                f"run_history={outcome.run_history_deleted} "
                 f"uncompacted={outcome.skipped_uncompacted} "
                 f"unsafe={outcome.skipped_unsafe_path} "
-                f"bytes={outcome.bytes_deleted}"
+                f"bytes={outcome.bytes_deleted} "
+                f"checkpoint_busy={outcome.wal_checkpoint_busy}"
             )
             if not arguments.apply:
                 print("Preview only. Add --apply to delete eligible files.")

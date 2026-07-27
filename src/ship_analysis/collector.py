@@ -84,16 +84,20 @@ class Collector:
                     if retention.candidate_runs or retention.skipped_uncompacted:
                         LOGGER.info(
                             "staging-retention-ok through=%s runs=%d raw=%d "
-                            "links=%d observations=%d uncompacted=%d unsafe=%d "
-                            "bytes=%d",
+                            "raw-too-new=%d links=%d observations=%d "
+                            "run-history=%d uncompacted=%d unsafe=%d "
+                            "bytes=%d checkpoint-busy=%d",
                             retention.eligible_through_operational_date,
                             retention.candidate_runs,
                             retention.raw_deleted,
+                            retention.skipped_raw_too_new,
                             retention.provenance_links_deleted,
                             retention.observations_deleted,
+                            retention.run_history_deleted,
                             retention.skipped_uncompacted,
                             retention.skipped_unsafe_path,
                             retention.bytes_deleted,
+                            retention.wal_checkpoint_busy,
                         )
                 except Exception:
                     LOGGER.exception("staging-retention-failed")

@@ -16,6 +16,9 @@ from .models import NormalizedObservation, normalize_observation, utc_now_iso
 from .providers import FetchResult
 
 
+WAL_JOURNAL_LIMIT_BYTES = 256 * 1024 * 1024
+
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS collection_runs (
     run_id TEXT PRIMARY KEY,
@@ -184,7 +187,11 @@ CREATE TABLE IF NOT EXISTS daily_collection_summaries (
     day_end_utc TEXT NOT NULL,
     generated_at_utc TEXT NOT NULL,
     health_status TEXT NOT NULL
-        CHECK (health_status IN ('healthy', 'warning', 'critical', 'no_data')),
+        CHECK (
+            health_status IN (
+                'healthy', 'warning', 'critical', 'partial', 'no_data'
+            )
+        ),
     summary_text TEXT NOT NULL,
     summary_json TEXT NOT NULL,
     output_path TEXT NOT NULL
@@ -204,6 +211,10 @@ CREATE INDEX IF NOT EXISTS idx_daily_records_type_date
     ON daily_track_records (record_type, operational_date);
 CREATE INDEX IF NOT EXISTS idx_period_stats_granularity_start
     ON collection_period_stats (granularity, period_start_utc);
+CREATE INDEX IF NOT EXISTS idx_runs_started
+    ON collection_runs (started_at_utc);
+CREATE INDEX IF NOT EXISTS idx_runs_raw_deleted
+    ON collection_runs (raw_deleted_at_utc);
 """
 
 
@@ -219,6 +230,10 @@ class Storage:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("PRAGMA synchronous=NORMAL")
+        connection.execute("PRAGMA busy_timeout=30000")
+        connection.execute("PRAGMA wal_autocheckpoint=1000")
+        connection.execute(f"PRAGMA journal_size_limit={WAL_JOURNAL_LIMIT_BYTES}")
         try:
             yield connection
             connection.commit()
@@ -232,7 +247,58 @@ class Storage:
         with self.connect() as connection:
             connection.executescript(SCHEMA)
             self._ensure_columns(connection)
+            self._ensure_daily_summary_health_values(connection)
             self._backfill_bbox_flags(connection)
+
+    @staticmethod
+    def _ensure_daily_summary_health_values(
+        connection: sqlite3.Connection,
+    ) -> None:
+        row = connection.execute(
+            """
+            SELECT sql
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'daily_collection_summaries'
+            """
+        ).fetchone()
+        if row is None or "'partial'" in str(row["sql"]):
+            return
+        connection.execute(
+            "ALTER TABLE daily_collection_summaries RENAME TO daily_collection_summaries_old"
+        )
+        connection.execute(
+            """
+            CREATE TABLE daily_collection_summaries (
+                operational_date TEXT PRIMARY KEY,
+                timezone TEXT NOT NULL,
+                day_start_utc TEXT NOT NULL,
+                day_end_utc TEXT NOT NULL,
+                generated_at_utc TEXT NOT NULL,
+                health_status TEXT NOT NULL
+                    CHECK (
+                        health_status IN (
+                            'healthy', 'warning', 'critical', 'partial', 'no_data'
+                        )
+                    ),
+                summary_text TEXT NOT NULL,
+                summary_json TEXT NOT NULL,
+                output_path TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO daily_collection_summaries
+            SELECT * FROM daily_collection_summaries_old
+            """
+        )
+        connection.execute("DROP TABLE daily_collection_summaries_old")
+
+    def checkpoint(self, *, truncate: bool = False) -> tuple[int, int, int]:
+        mode = "TRUNCATE" if truncate else "PASSIVE"
+        with self.connect() as connection:
+            row = connection.execute(f"PRAGMA wal_checkpoint({mode})").fetchone()
+        return int(row[0]), int(row[1]), int(row[2])
 
     @staticmethod
     def _ensure_columns(connection: sqlite3.Connection) -> None:

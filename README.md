@@ -8,14 +8,16 @@
 - 保存压缩原始快照，并把常用字段标准化到 SQLite；重叠区域的数据会去重，
   但采集来源关系仍然保留。
 - 每天按荷兰本地时间 `04:00–次日 04:00` 形成一个运营日；04:15 自动生成
-  停泊整合层，同时完整原始数据保持不变。
-- 原始 `.json.gz`、标准化 `observations/raw_json` 和采集来源关系作为
-  中间层；对应运营日整合成功后，按 24 小时运营日批次自动清理。
+  停泊整合层。
+- 原始 `.json.gz` 至少保留采集后 24 小时；标准化观测和采集来源关系作为
+  当天中间层。运营日整合成功后分批清理，并在清理后回收 SQLite WAL。
+- 完整 provider JSON 不再重复写入常规 SQLite 观测行；原始 gzip 是24小时
+  源数据，长期分析使用每日整合表和每日压缩归档。
 - 失败、页数、数据量、耗时和原始文件路径都写入审计表。
 - 自动形成分钟、小时和运营日抓取统计；每天生成带健康判断的 JSON 抓取
   总结。控制台采集日志同时轮转保存到 `data/logs/collector.log`。
-- 提供本地实时可视化界面，显示全国 48 网格、抓取趋势、关键指标、最近
-  请求、停泊整合和每日健康总结。
+- 提供轻量实时健康界面，只显示采集量、完成率、磁盘、WAL、每日处理状态
+  和需要调查的异常原因。
 
 > 范围说明：当前数据源是 EuRIS 的船舶 track API。这里的“荷兰全域”指在
 > 荷兰 bbox 内抓取 EuRIS 可提供的内河航运轨迹，不等同于岸基接收机产生的
@@ -31,6 +33,40 @@ EuRIS 要求在使用其服务时保留来源说明；原始快照已经写入�
 Set-Location C:\DT\ship_analysis
 powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 ```
+
+## Debian VPS 部署
+
+项目提供不依赖 Docker 的生产部署：采集器、聚合接口和前端分别由 systemd
+管理，Nginx 是唯一公开入口。3000 和 8765 只监听 `127.0.0.1`。
+
+将项目源代码放在 `/opt/ship_analysis/app` 后，以 root 运行：
+
+```bash
+bash /opt/ship_analysis/app/deploy/bootstrap-debian.sh
+```
+
+安装脚本会创建无登录权限的 `shipanalysis` 系统用户，安装当前 Node.js 22、
+Python 虚拟环境、Nginx 和三个开机自启服务。服务器无需 Token 即可访问当前
+EuRIS 接口时，`/etc/ship-analysis/collector.env` 可以保持为空；若数据源以后
+要求认证，只在该文件中加入 `EURIS_API_TOKEN=...`，不要写入项目文件。
+
+部署后的检查命令：
+
+```bash
+systemctl status ship-analysis-collector ship-analysis-dashboard-api \
+  ship-analysis-dashboard-web nginx
+journalctl -u ship-analysis-collector -f
+curl http://127.0.0.1/health
+```
+
+需要配置或更换 EuRIS Token 时，在本机 PowerShell 运行：
+
+```powershell
+.\scripts\set_server_token.ps1 -Server <服务器IP>
+```
+
+脚本通过交互式隐藏输入验证 Token，不会把 Token 写入代码或 PowerShell
+历史；检测到完整 Token 被重复粘贴时会拒绝保存。
 
 查看展开后的 48 个采集目标：
 
@@ -70,20 +106,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_dashboard.ps1
 ```
 
 脚本会打开 [http://localhost:3000](http://localhost:3000)。保持这个窗口
-运行；按 `Ctrl+C` 可以停止界面。本地页面每 30 秒从只读接口刷新 SQLite
-统计，采集器仍使用前面的 `run_collector.ps1` 在独立窗口持续运行。
+运行；按 `Ctrl+C` 可以停止界面。本地页面每 30 秒读取轻量聚合接口，采集器
+仍使用前面的 `run_collector.ps1` 在独立窗口持续运行。
 
 界面包括：
 
-- 当前采集器是否在线、最近抓取时间和最新网格；
-- 本分钟、本小时和当前运营日的返回量、新增量、成功率与 P95 耗时；
-- 最近 60 分钟、24 小时和 14 个运营日的吞吐趋势；
-- `8 × 6` 全国网格热度、更新新鲜度和失败状态；
-- 最近 12 次 bbox 请求；
-- 最新每日抓取总结和停泊整合数量。
+- 当前采集器是否在线、最近抓取时间和60秒采集配置；
+- 最近一小时及当前运营日的 API 返回量和新增唯一观测量；
+- 最近一小时计划完成率与失败请求数；
+- 数据目录大小、磁盘剩余空间、SQLite逻辑大小和 WAL 大小；
+- 最近24小时采集量趋势；
+- 每日整合、24小时原始文件保留和14天请求明细保留状态；
+- 明确的采集延迟、计划缺失、请求失败、磁盘、WAL和整合异常原因。
 
-界面只返回聚合指标和网格编号，不返回 EuRIS token、`raw_json`、船舶身份
-字段或具体轨迹位置。接口地址是
+界面只返回聚合指标，不返回 EuRIS token、船舶身份字段或具体轨迹位置。
+接口只扫描带索引的短期请求审计和文件大小，不做跨百万行轨迹去重。地址是
 `http://127.0.0.1:8765/api/dashboard`，默认只允许本机页面跨域读取。
 
 托管页面使用构建时的安全聚合快照，因为互联网页面无法直接访问电脑上的
@@ -158,12 +195,18 @@ Get-Content .\data\logs\collector.log -Tail 50 -Wait
 健康等级使用确定性规则，方便复算和告警：
 
 - `healthy`：计划完成率至少 98%、请求成功率至少 99%、48 个网格均出现，
-  且没有分页异常；
+  且分页 `count` 变化率不超过 5%；
 - `warning`：未达到上述健康条件，但计划完成率仍至少 90%、请求成功率仍
   至少 95%；
 - `critical`：没有成功数据，或计划完成率低于 90%，或请求成功率低于
   95%；
+- `partial`：首次启动只覆盖了部分运营日，或使用 `--allow-incomplete`
+  生成尚未封账的总结；不作为采集故障；
 - `no_data`：该运营日完全没有采集运行。
+
+页内重复继续记录为质量信息，但不再直接触发异常；EuRIS 实时分页期间的少量
+重复是已知现象。实时健康页还会检查最近180/600秒采集新鲜度、磁盘剩余比例、
+WAL相对逻辑数据库大小和最新每日整合结果。
 
 手动生成或查看已经封账的运营日总结：
 
@@ -177,8 +220,8 @@ Get-Content .\data\logs\collector.log -Tail 50 -Wait
 .\.venv\Scripts\python.exe -m ship_analysis daily-summary --date 2026-07-25 --force
 ```
 
-仅用于现场检查时，可以生成尚未结束的临时总结；它会因为缺少后续时段而
-显示较低的计划完成率，不能当作最终日报：
+仅用于现场检查时，可以生成尚未结束的临时总结；它标记为 `partial`，不能
+当作最终日报：
 
 ```powershell
 .\.venv\Scripts\python.exe -m ship_analysis daily-summary --date 2026-07-26 --allow-incomplete --force
@@ -243,17 +286,21 @@ enabled = true
 - `daily_track_records.record_type = stationary`：连续不变位置合并形成的
   停泊段；
 - `data/compacted` 中对应的每日 gzip；
-- `collection_runs` 中不含明细的轻量采集审计。
+- 分钟、小时、运营日统计和每日健康总结。
 
-每个 04:00–次日 04:00 运营日整合成功后，清理该运营日的中间层：
+每个 04:00–次日 04:00 运营日整合成功后：
 
-1. `data/raw` 原始 EuRIS gzip；
-2. `collection_observations` 来源关系；
-3. 不再被其他未清理运营日引用的 `observations`；
-4. 随 `observations` 一起清理的完整 `raw_json`。
+1. 立即分批清理 `collection_observations` 来源关系；
+2. 分批清理不再被其他运营日引用的 `observations`；
+3. 原始 `.json.gz` 到达采集后24小时才删除，即使每日整合已经完成；
+4. 每次删除事务最多25,000条，完成后执行 WAL checkpoint/truncate；
+5. 已完成清理的逐网格 `collection_runs` 明细保留14天，之后只保留已物化
+   的分钟、小时、运营日统计和每日总结。
 
 跨越日界线且仍被下一运营日引用的观测不会提前删除。删除时间和原因记录在
-`collection_runs`；任何未完成日整合的数据都不会清理。
+`collection_runs`；任何未完成日整合的数据都不会清理。普通观测行只保存
+标准化字段，不再重复保存约数百字节的完整 provider JSON；只有无法由
+`trackID`、时间和位置识别的匿名记录保留完整 JSON 以生成稳定键。
 
 预览当前可清理中间层，不执行删除：
 
@@ -290,8 +337,8 @@ SQLite 中的主要表：
 - `daily_collection_summaries`：每日健康等级、中文总结、完整 JSON 和输出
   文件路径。
 
-`data/raw`、`observations/raw_json` 和 `collection_observations` 是当天
-整合所需的中间层，不是长期分析接口。长期分析统一使用
+`data/raw`、`observations` 和 `collection_observations` 是短期中间层，
+不是长期分析接口。长期分析统一使用
 `daily_track_records` 或 `data/compacted`。
 
 详细语义见 [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md)，后续建设顺序见
@@ -330,7 +377,8 @@ flowchart LR
 - 当前是研究型单机基线。长周期全量采集应按 `docs/ROADMAP.md` 迁移到
   Parquet 与 PostGIS/TimescaleDB，并加入监控、备份和保留策略。
 - `daily_track_records` 是长期分析层。原始 gzip、标准化观测和来源关系只
-  保留到对应 24 小时运营日成功整合；失败日保留中间层等待重试。
+  作为短期中间层；来源关系要求运营日成功整合后才清理，原始 gzip 还必须
+  达到采集后24小时。失败日保留中间层等待重试。
 - EuRIS bbox 是实时变化的分页列表，不是事务冻结快照。框架会记录分页内
   重复和 `实际条数 - 接口初始 count`；做精确断面流量时应优先使用较小 bbox
   或 fairway-section 接口，并以位置时间去重。

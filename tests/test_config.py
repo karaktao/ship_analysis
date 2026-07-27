@@ -36,6 +36,9 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual("Europe/Amsterdam", config.compaction.timezone)
         self.assertEqual(4, config.compaction.day_boundary_hour)
         self.assertEqual(24, config.retention.cleanup_interval_hours)
+        self.assertEqual(24, config.retention.raw_min_age_hours)
+        self.assertEqual(14, config.retention.run_detail_days)
+        self.assertEqual(25_000, config.retention.delete_batch_size)
         self.assertTrue(config.retention.require_completed_compaction)
 
 

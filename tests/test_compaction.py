@@ -276,10 +276,22 @@ class CompactionTests(unittest.TestCase):
                     (next_fetched_at, next_fetched_at, next_run),
                 )
 
-            retention = RawRetention(config, storage).prune()
+            held = RawRetention(config, storage).prune(
+                now_utc=datetime(2026, 7, 27, 1, 0, tzinfo=timezone.utc)
+            )
+            self.assertEqual(0, held.raw_deleted)
+            self.assertEqual(12, held.skipped_raw_too_new)
+            self.assertEqual(12, held.provenance_links_deleted)
+            self.assertEqual(0, held.observations_deleted)
+            self.assertTrue(all(path.exists() for path in raw_paths))
+
+            retention = RawRetention(config, storage).prune(
+                now_utc=datetime(2026, 7, 27, 3, 0, tzinfo=timezone.utc)
+            )
             self.assertEqual(12, retention.raw_deleted)
+            self.assertEqual(0, retention.skipped_raw_too_new)
             self.assertEqual(1, retention.skipped_uncompacted)
-            self.assertEqual(12, retention.provenance_links_deleted)
+            self.assertEqual(0, retention.provenance_links_deleted)
             self.assertEqual(0, retention.observations_deleted)
             self.assertTrue(all(not path.exists() for path in raw_paths))
             self.assertTrue(next_path.exists())
