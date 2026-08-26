@@ -16,10 +16,13 @@ circuit_failure_threshold = 8
 circuit_cooldown_seconds = 60
 max_pages = 200
 request_gap_seconds = 0.35
-user_agent = "ship-analysis/0.1 (EuRIS research collector)"
+user_agent = "ship-analysis/0.2.1 (EuRIS research collector)"
 
 [runner]
 idle_sleep_seconds = 1.0
+# Keep network work bounded: one slow tile occupies only one of four slots.
+# The scheduler never queues more work than this or overlaps the same tile.
+collection_workers = 4
 
 [compaction]
 enabled = true

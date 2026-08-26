@@ -39,6 +39,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(45, config.provider.request_budget_seconds)
         self.assertEqual(8, config.provider.circuit_failure_threshold)
         self.assertEqual(60, config.provider.circuit_cooldown_seconds)
+        self.assertEqual(4, config.collection_workers)
         self.assertEqual("Europe/Amsterdam", config.compaction.timezone)
         self.assertEqual(4, config.compaction.day_boundary_hour)
         self.assertEqual(24, config.retention.cleanup_interval_hours)

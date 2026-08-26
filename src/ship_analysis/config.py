@@ -120,6 +120,7 @@ class AppConfig:
     retention: RetentionConfig
     idle_sleep_seconds: float
     areas: tuple[AreaConfig, ...]
+    collection_workers: int = 4
 
     def targets(self, enabled_only: bool = True) -> tuple[CollectionTarget, ...]:
         targets: list[CollectionTarget] = []
@@ -239,6 +240,10 @@ def load_config(path: str | Path = "config/regions.toml") -> AppConfig:
     if circuit_cooldown_seconds <= 0:
         raise ValueError("provider.circuit_cooldown_seconds must be positive")
 
+    collection_workers = int(runner.get("collection_workers", 4))
+    if not 1 <= collection_workers <= 8:
+        raise ValueError("runner.collection_workers must be between 1 and 8")
+
     return AppConfig(
         config_path=config_path,
         project_root=project_root,
@@ -253,7 +258,7 @@ def load_config(path: str | Path = "config/regions.toml") -> AppConfig:
             max_retries=max_retries,
             max_pages=int(provider.get("max_pages", 200)),
             request_gap_seconds=float(provider.get("request_gap_seconds", 0.25)),
-            user_agent=str(provider.get("user_agent", "ship-analysis/0.1")),
+            user_agent=str(provider.get("user_agent", "ship-analysis/0.2.1")),
             request_budget_seconds=request_budget_seconds,
             circuit_failure_threshold=circuit_failure_threshold,
             circuit_cooldown_seconds=circuit_cooldown_seconds,
@@ -280,6 +285,7 @@ def load_config(path: str | Path = "config/regions.toml") -> AppConfig:
         ),
         idle_sleep_seconds=float(runner.get("idle_sleep_seconds", 1.0)),
         areas=tuple(areas),
+        collection_workers=collection_workers,
     )
 
 

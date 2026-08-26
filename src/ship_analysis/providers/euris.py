@@ -6,6 +6,7 @@ from email.utils import parsedate_to_datetime
 import json
 import logging
 import random
+import threading
 import time
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -47,6 +48,7 @@ class EurisClient:
         self.config = config
         self._consecutive_failures = 0
         self._circuit_open_until = 0.0
+        self._circuit_lock = threading.Lock()
 
     def fetch_bbox(self, bbox: BBox) -> FetchResult:
         self._ensure_circuit_available()
@@ -182,43 +184,43 @@ class EurisClient:
         ) from last_error
 
     def _ensure_circuit_available(self) -> None:
-        now = time.monotonic()
-        if now < self._circuit_open_until:
-            raise ProviderUnavailable(
-                "EuRIS circuit open; retry in "
-                f"{self._circuit_open_until - now:.1f}s"
-            )
-        if self._circuit_open_until:
-            LOGGER.warning(
-                "euris-circuit-half-open prior_failures=%d",
-                self._consecutive_failures,
-            )
+        with self._circuit_lock:
+            now = time.monotonic()
+            if now < self._circuit_open_until:
+                raise ProviderUnavailable(
+                    "EuRIS circuit open; retry in "
+                    f"{self._circuit_open_until - now:.1f}s"
+                )
+            if self._circuit_open_until:
+                LOGGER.warning(
+                    "euris-circuit-half-open prior_failures=%d",
+                    self._consecutive_failures,
+                )
 
     def _record_transient_failure(self, error: Exception) -> None:
-        self._consecutive_failures += 1
-        if (
-            self._consecutive_failures
-            < self.config.circuit_failure_threshold
-        ):
-            return
-        self._circuit_open_until = (
-            time.monotonic() + self.config.circuit_cooldown_seconds
-        )
-        LOGGER.error(
-            "euris-circuit-open failures=%d cooldown=%.1fs error=%s",
-            self._consecutive_failures,
-            self.config.circuit_cooldown_seconds,
-            error,
-        )
+        with self._circuit_lock:
+            self._consecutive_failures += 1
+            if self._consecutive_failures < self.config.circuit_failure_threshold:
+                return
+            self._circuit_open_until = (
+                time.monotonic() + self.config.circuit_cooldown_seconds
+            )
+            LOGGER.error(
+                "euris-circuit-open failures=%d cooldown=%.1fs error=%s",
+                self._consecutive_failures,
+                self.config.circuit_cooldown_seconds,
+                error,
+            )
 
     def _record_success(self) -> None:
-        if self._consecutive_failures or self._circuit_open_until:
-            LOGGER.info(
-                "euris-circuit-recovered prior_failures=%d",
-                self._consecutive_failures,
-            )
-        self._consecutive_failures = 0
-        self._circuit_open_until = 0.0
+        with self._circuit_lock:
+            if self._consecutive_failures or self._circuit_open_until:
+                LOGGER.info(
+                    "euris-circuit-recovered prior_failures=%d",
+                    self._consecutive_failures,
+                )
+            self._consecutive_failures = 0
+            self._circuit_open_until = 0.0
 
     @staticmethod
     def _retry_delay(attempt: int, retry_after: str | None) -> float:
