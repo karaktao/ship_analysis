@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import sqlite3
 import tempfile
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .config import AppConfig, CompactionConfig
@@ -451,19 +451,14 @@ class DailyCompactor:
             )
 
         try:
-            samples = self._load_samples(start_utc, end_utc)
-            grouped: dict[str, list[SourceSample]] = defaultdict(list)
-            for sample in samples:
-                grouped[sample.track_key].append(sample)
-
-            records: list[CompactedRecord] = []
-            for track_key in sorted(grouped):
-                records.extend(compact_track(grouped[track_key], self.settings))
-
-            output_path = self._write_output(
-                operational_date, start_utc, end_utc, samples, records
+            summary = self._summarize_tracks(start_utc, end_utc)
+            output_path = self._write_streamed_output(
+                operational_date,
+                start_utc,
+                end_utc,
+                summary,
+                day_key,
             )
-            self._store_records(day_key, grouped, samples, records, output_path)
         except Exception as error:
             with self.storage.connect() as connection:
                 connection.execute(
@@ -476,21 +471,261 @@ class DailyCompactor:
                 )
             raise
 
-        stationary = [
-            record for record in records if record.record_type == "stationary"
-        ]
         return CompactionOutcome(
             operational_date=day_key,
-            source_samples=len(samples),
-            tracks=len(grouped),
-            output_records=len(records),
-            position_records=len(records) - len(stationary),
-            stationary_records=len(stationary),
-            stationary_source_samples=sum(
-                record.sample_count for record in stationary
-            ),
+            source_samples=summary["source_samples"],
+            tracks=summary["tracks"],
+            output_records=summary["output_records"],
+            position_records=summary["position_records"],
+            stationary_records=summary["stationary_records"],
+            stationary_source_samples=summary["stationary_source_samples"],
             output_path=str(output_path),
         )
+
+    @staticmethod
+    def _row_to_sample(row: sqlite3.Row) -> SourceSample:
+        return SourceSample(
+            observation_id=int(row["observation_id"]),
+            observed_at=_parse_datetime(row["observed_at_utc"]),
+            position_time_utc=row["position_time_utc"],
+            track_id=row["track_id"],
+            lat=row["lat"],
+            lon=row["lon"],
+            speed_ground=row["speed_ground"],
+            course_ground=row["course_ground"],
+            is_moving=row["is_moving"],
+            vessel_name=row["vessel_name"],
+            call_sign=row["call_sign"],
+            mmsi=row["mmsi"],
+            eni=row["eni"],
+            imo=row["imo"],
+            length_m=row["length_m"],
+            beam_m=row["beam_m"],
+            ais_ship_type=row["ais_ship_type"],
+            eri_ship_type=row["eri_ship_type"],
+            isrs_code=row["isrs_code"],
+            isrs_name=row["isrs_name"],
+            direction=row["direction"],
+            privacy_class=row["privacy_class"],
+        )
+
+    def _iter_track_groups(
+        self, start_utc: datetime, end_utc: datetime
+    ) -> Iterator[list[SourceSample]]:
+        """Yield one track at a time with SQLite sorting on disk."""
+        query = """
+            SELECT
+                o.observation_id,
+                r.started_at_utc AS observed_at_utc,
+                o.position_time_utc,
+                o.track_id,
+                o.lat,
+                o.lon,
+                o.speed_ground,
+                o.course_ground,
+                o.is_moving,
+                o.vessel_name,
+                o.call_sign,
+                o.mmsi,
+                o.eni,
+                o.imo,
+                o.length_m,
+                o.beam_m,
+                o.ais_ship_type,
+                o.eri_ship_type,
+                o.isrs_code,
+                o.isrs_name,
+                o.direction,
+                o.privacy_class
+            FROM collection_runs r
+            JOIN collection_observations co ON co.run_id = r.run_id
+            JOIN observations o ON o.observation_id = co.observation_id
+            WHERE r.status = 'completed'
+              AND r.started_at_utc >= ?
+              AND r.started_at_utc < ?
+              AND co.inside_requested_bbox = 1
+            ORDER BY o.track_id, r.started_at_utc, o.observation_id
+        """
+        with self.storage.connect() as connection:
+            # The result is streamed row-by-row, while SQLite's large sort is
+            # forced to disk. This avoids both Python fetchall() amplification
+            # and a second full-table scan for every track chunk.
+            connection.execute("PRAGMA temp_store=FILE")
+            connection.execute("PRAGMA cache_size=-32768")
+            rows = connection.execute(
+                query,
+                (
+                    start_utc.astimezone(timezone.utc).isoformat(timespec="seconds"),
+                    end_utc.astimezone(timezone.utc).isoformat(timespec="seconds"),
+                ),
+            )
+            current_key: str | None = None
+            group: list[SourceSample] = []
+            for row in rows:
+                sample = self._row_to_sample(row)
+                if group and sample.track_key != current_key:
+                    yield group
+                    group = []
+                current_key = sample.track_key
+                group.append(sample)
+            if group:
+                yield group
+
+    def _summarize_tracks(
+        self, start_utc: datetime, end_utc: datetime
+    ) -> dict[str, int]:
+        summary = {
+            "source_samples": 0,
+            "tracks": 0,
+            "output_records": 0,
+            "position_records": 0,
+            "stationary_records": 0,
+            "stationary_source_samples": 0,
+        }
+        for samples in self._iter_track_groups(start_utc, end_utc):
+            records = compact_track(samples, self.settings)
+            stationary = [
+                record for record in records if record.record_type == "stationary"
+            ]
+            summary["source_samples"] += len(samples)
+            summary["tracks"] += 1
+            summary["output_records"] += len(records)
+            summary["position_records"] += len(records) - len(stationary)
+            summary["stationary_records"] += len(stationary)
+            summary["stationary_source_samples"] += sum(
+                record.sample_count for record in stationary
+            )
+        return summary
+
+    def _write_streamed_output(
+        self,
+        operational_date: date,
+        start_utc: datetime,
+        end_utc: datetime,
+        summary: dict[str, int],
+        day_key: str,
+    ) -> Path:
+        directory = (
+            self.output_dir
+            / f"{operational_date.year:04d}"
+            / f"{operational_date.month:02d}"
+        )
+        directory.mkdir(parents=True, exist_ok=True)
+        output_path = directory / (
+            f"operational-day-{operational_date.isoformat()}.json.gz"
+        )
+        metadata = {
+            "operational_date": operational_date.isoformat(),
+            "timezone": self.settings.timezone,
+            "day_start_utc": _iso_utc(start_utc),
+            "day_end_utc": _iso_utc(end_utc),
+            "created_at_utc": utc_now_iso(),
+            **summary,
+            "settings": asdict(self.settings),
+            "source_layer_retained": True,
+        }
+        insert_sql = """
+            INSERT INTO daily_track_records (
+                operational_date, track_key, track_id, sequence_no, record_type,
+                started_at_utc, ended_at_utc, first_position_time_utc,
+                last_position_time_utc, representative_lat, representative_lon,
+                start_lat, start_lon, end_lat, end_lon, duration_seconds,
+                sample_count, unique_observation_count, max_radius_m,
+                source_observation_id, speed_ground, course_ground,
+                source_is_moving, vessel_name, call_sign, mmsi, eni, imo,
+                length_m, beam_m, ais_ship_type, eri_ship_type, isrs_code,
+                isrs_name, direction, privacy_class
+            ) VALUES (
+                :operational_date, :track_key, :track_id, :sequence_no,
+                :record_type, :started_at_utc, :ended_at_utc,
+                :first_position_time_utc, :last_position_time_utc,
+                :representative_lat, :representative_lon, :start_lat, :start_lon,
+                :end_lat, :end_lon, :duration_seconds, :sample_count,
+                :unique_observation_count, :max_radius_m,
+                :source_observation_id, :speed_ground, :course_ground,
+                :source_is_moving, :vessel_name, :call_sign, :mmsi, :eni, :imo,
+                :length_m, :beam_m, :ais_ship_type, :eri_ship_type, :isrs_code,
+                :isrs_name, :direction, :privacy_class
+            )
+        """
+        file_descriptor, temporary_name = tempfile.mkstemp(
+            dir=directory, prefix=".compacted_", suffix=".tmp"
+        )
+        try:
+            with os.fdopen(file_descriptor, "wb") as raw_file:
+                with gzip.GzipFile(
+                    fileobj=raw_file, mode="wb", compresslevel=6
+                ) as gz:
+                    gz.write(b'{"metadata":')
+                    gz.write(
+                        json.dumps(
+                            metadata, ensure_ascii=False, separators=(",", ":")
+                        ).encode("utf-8")
+                    )
+                    gz.write(b',"records":[')
+                    first_record = True
+                    batch: list[dict[str, Any]] = []
+                    for samples in self._iter_track_groups(start_utc, end_utc):
+                        records = compact_track(samples, self.settings)
+                        for record in records:
+                            if not first_record:
+                                gz.write(b",")
+                            first_record = False
+                            gz.write(
+                                json.dumps(
+                                    asdict(record),
+                                    ensure_ascii=False,
+                                    separators=(",", ":"),
+                                ).encode("utf-8")
+                            )
+                            values = asdict(record)
+                            values["operational_date"] = day_key
+                            batch.append(values)
+                        if len(batch) >= 1000:
+                            with self.storage.connect() as connection:
+                                connection.executemany(insert_sql, batch)
+                            batch.clear()
+                    if batch:
+                        with self.storage.connect() as connection:
+                            connection.executemany(insert_sql, batch)
+                    gz.write(b"]}")
+            os.replace(temporary_name, output_path)
+        except Exception:
+            try:
+                os.unlink(temporary_name)
+            except FileNotFoundError:
+                pass
+            raise
+
+        with self.storage.connect() as connection:
+            connection.execute(
+                """
+                UPDATE daily_compaction_runs
+                SET status = 'completed',
+                    completed_at_utc = ?,
+                    source_sample_count = ?,
+                    track_count = ?,
+                    output_record_count = ?,
+                    position_record_count = ?,
+                    stationary_record_count = ?,
+                    stationary_source_sample_count = ?,
+                    output_path = ?,
+                    error = NULL
+                WHERE operational_date = ?
+                """,
+                (
+                    utc_now_iso(),
+                    summary["source_samples"],
+                    summary["tracks"],
+                    summary["output_records"],
+                    summary["position_records"],
+                    summary["stationary_records"],
+                    summary["stationary_source_samples"],
+                    str(output_path),
+                    day_key,
+                ),
+            )
+        return output_path
 
     def compact_pending(
         self, now_utc: datetime | None = None

@@ -11,6 +11,7 @@ from .collector import Collector
 from .compaction import DailyCompactor, latest_ready_operational_date
 from .config import CollectionTarget, load_config
 from .dashboard import export_dashboard_snapshot, serve_dashboard_api
+from .maintenance import MaintenanceWorker
 from .reporting import CollectionReporter
 from .retention import StagingRetention
 from .storage import Storage
@@ -47,8 +48,36 @@ def _parser() -> argparse.ArgumentParser:
         help="Optional expanded tile id, for example r01c01",
     )
 
-    subparsers.add_parser(
-        "run", help="Run the continuous national scheduler and daily compactor"
+    subparsers.add_parser("run", help="Run the continuous national scheduler")
+
+    maintenance = subparsers.add_parser(
+        "maintenance",
+        help="Run reporting, daily compaction and retention outside the collector",
+    )
+    maintenance.add_argument(
+        "--interval-seconds",
+        type=int,
+        default=60,
+        help="Seconds between maintenance passes (default: 60)",
+    )
+    maintenance.add_argument(
+        "--with-retention",
+        action="store_true",
+        help=(
+            "Also run staging deletion; disabled by default because large "
+            "SQLite deletes can delay collection writes"
+        ),
+    )
+
+    recover = subparsers.add_parser(
+        "recover-stale-runs",
+        help="Mark abandoned running requests as failed after a grace period",
+    )
+    recover.add_argument(
+        "--max-age-minutes",
+        type=int,
+        default=15,
+        help="Minimum age of a running row to recover (default: 15)",
     )
 
     compact = subparsers.add_parser(
@@ -74,6 +103,17 @@ def _parser() -> argparse.ArgumentParser:
         "--apply",
         action="store_true",
         help="Delete eligible raw snapshots; without this flag only preview",
+    )
+    prune.add_argument(
+        "--max-runs",
+        type=int,
+        help="Maximum oldest collection runs to inspect in this pass",
+    )
+    prune.add_argument(
+        "--batch-pause-seconds",
+        type=float,
+        default=0.0,
+        help="Pause between committed SQLite delete batches (default: 0)",
     )
 
     status = subparsers.add_parser("status", help="Show local database status")
@@ -259,7 +299,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = load_config(arguments.config)
         storage = Storage(config.database, config.raw_dir)
-        if arguments.command in {"collect", "run"}:
+        if arguments.command in {"collect", "run", "maintenance"}:
             _configure_file_logging(config.data_dir)
 
         if arguments.command == "init-db":
@@ -271,6 +311,16 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if arguments.command == "status":
             _print_status(storage, arguments.limit)
+            return 0
+        if arguments.command == "recover-stale-runs":
+            storage.initialize()
+            recovered = storage.recover_stale_runs(
+                max_age_seconds=arguments.max_age_minutes * 60
+            )
+            print(
+                f"recovered-stale-runs={recovered} "
+                f"max_age_minutes={arguments.max_age_minutes}"
+            )
             return 0
         if arguments.command == "collection-log":
             reporter = CollectionReporter(config, storage)
@@ -312,6 +362,15 @@ def main(argv: list[str] | None = None) -> int:
             path = export_dashboard_snapshot(config, storage, output)
             print(f"dashboard-snapshot={path}")
             return 0
+        if arguments.command == "maintenance":
+            worker = MaintenanceWorker(
+                config, run_retention=arguments.with_retention
+            )
+            try:
+                worker.run_forever(arguments.interval_seconds)
+            except KeyboardInterrupt:
+                print("\nMaintenance stopped.")
+            return 0
         if arguments.command == "compact-day":
             storage.initialize()
             compactor = DailyCompactor(config, storage)
@@ -339,9 +398,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"output={outcome.output_path}")
             return 0
         if arguments.command in {"prune-staging", "prune-raw"}:
-            storage.initialize()
             outcome = StagingRetention(config, storage).prune(
-                dry_run=not arguments.apply
+                dry_run=not arguments.apply,
+                max_runs=arguments.max_runs,
+                batch_pause_seconds=arguments.batch_pause_seconds,
             )
             mode = "applied" if arguments.apply else "preview"
             print(

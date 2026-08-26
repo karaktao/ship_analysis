@@ -244,6 +244,17 @@ class CompactionTests(unittest.TestCase):
             self.assertEqual("stationary", record["record_type"])
             self.assertEqual(12, record["sample_count"])
 
+            # A completed database marker is not sufficient on its own: the
+            # final archive must still exist before source data is eligible.
+            compacted_path = Path(outcome.output_path)
+            held_path = compacted_path.with_suffix(".held")
+            compacted_path.replace(held_path)
+            missing_archive = RawRetention(config, storage).prune(max_runs=5)
+            self.assertEqual(0, missing_archive.candidate_runs)
+            self.assertEqual(5, missing_archive.skipped_uncompacted)
+            self.assertTrue(all(path.exists() for path in raw_paths))
+            held_path.replace(compacted_path)
+
             # The same normalized observation can be referenced on the next
             # operational day. Cleaning the completed day must remove only the
             # old provenance links and keep the shared observation alive.
@@ -285,10 +296,19 @@ class CompactionTests(unittest.TestCase):
             self.assertEqual(0, held.observations_deleted)
             self.assertTrue(all(path.exists() for path in raw_paths))
 
+            bounded = RawRetention(config, storage).prune(
+                now_utc=datetime(2026, 7, 27, 3, 0, tzinfo=timezone.utc),
+                max_runs=5,
+                batch_pause_seconds=0.001,
+            )
+            self.assertEqual(5, bounded.candidate_runs)
+            self.assertEqual(5, bounded.raw_deleted)
+            self.assertEqual(7, sum(path.exists() for path in raw_paths))
+
             retention = RawRetention(config, storage).prune(
                 now_utc=datetime(2026, 7, 27, 3, 0, tzinfo=timezone.utc)
             )
-            self.assertEqual(12, retention.raw_deleted)
+            self.assertEqual(7, retention.raw_deleted)
             self.assertEqual(0, retention.skipped_raw_too_new)
             self.assertEqual(1, retention.skipped_uncompacted)
             self.assertEqual(0, retention.provenance_links_deleted)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ship-analysis"
-version = "0.1.0"
+version = "0.2.0"
 description = "Configurable Netherlands-wide AIS/track collection foundation"
 readme = "README.md"
 requires-python = ">=3.11"

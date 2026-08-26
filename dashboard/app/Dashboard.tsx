@@ -97,6 +97,28 @@ type DashboardData = {
   } | null;
 };
 
+type CalendarDay = {
+  operationalDate: string;
+  generatedAt: string | null;
+  healthStatus: HealthStatus;
+  received: number;
+  newObservations: number;
+  uniqueItems: number;
+  expectedRuns: number;
+  observedRuns: number;
+  completedRuns: number;
+  failedRuns: number;
+  runningRuns: number;
+  completionRate: number | null;
+  isFinal: boolean;
+};
+
+type CalendarPayload = {
+  month: string;
+  timezone: string;
+  days: CalendarDay[];
+};
+
 const integer = new Intl.NumberFormat("en-US");
 const percent = new Intl.NumberFormat("en-US", {
   style: "percent",
@@ -133,6 +155,27 @@ function freshness(seconds: number | null) {
   return `${Math.floor(seconds / 3600)}h ago`;
 }
 
+function currentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function shiftMonth(month: string, offset: number) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const shifted = new Date(year, monthNumber - 1 + offset, 1);
+  return `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function calendarStatusLabel(status: HealthStatus) {
+  return {
+    healthy: "Healthy",
+    warning: "Warning",
+    critical: "Critical",
+    partial: "Partial",
+    no_data: "No data",
+  }[status];
+}
+
 async function fetchDashboard(): Promise<DashboardData> {
   const local =
     typeof window !== "undefined" &&
@@ -161,11 +204,23 @@ async function fetchDashboard(): Promise<DashboardData> {
     : new Error("Dashboard data is unavailable");
 }
 
+async function fetchCalendar(month: string): Promise<CalendarPayload> {
+  const response = await fetch(`/api/calendar?month=${encodeURIComponent(month)}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Calendar HTTP ${response.status}`);
+  return (await response.json()) as CalendarPayload;
+}
+
 export function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(currentMonthKey);
+  const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(true);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -192,6 +247,43 @@ export function Dashboard() {
       window.clearInterval(timer);
     };
   }, [refresh]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCalendar(calendarMonth)
+      .then((payload) => {
+        if (cancelled) return;
+        setCalendarDays(payload.days);
+        setCalendarError(null);
+      })
+      .catch((calendarRefreshError) => {
+        if (cancelled) return;
+        setCalendarDays([]);
+        setCalendarError(
+          calendarRefreshError instanceof Error
+            ? calendarRefreshError.message
+            : "Calendar data unavailable",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setCalendarLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [calendarMonth]);
+
+  const shiftCalendarMonth = useCallback((offset: number) => {
+    setCalendarLoading(true);
+    setCalendarMonth((value) => shiftMonth(value, offset));
+  }, []);
+
+  const showCurrentCalendarMonth = useCallback(() => {
+    const current = currentMonthKey();
+    if (calendarMonth === current) return;
+    setCalendarLoading(true);
+    setCalendarMonth(current);
+  }, [calendarMonth]);
 
   const peak = useMemo(
     () => Math.max(1, ...(data?.volume.hourly.map((row) => row.received) ?? [1])),
@@ -284,6 +376,17 @@ export function Dashboard() {
           </div>
         </dl>
       </section>
+
+      <CalendarPanel
+        month={calendarMonth}
+        days={calendarDays}
+        loading={calendarLoading}
+        error={calendarError}
+        timezone={data.timezone}
+        onPrevious={() => shiftCalendarMonth(-1)}
+        onNext={() => shiftCalendarMonth(1)}
+        onToday={showCurrentCalendarMonth}
+      />
 
       <section className="metric-grid" aria-label="Key collection metrics">
         <MetricCard
@@ -500,5 +603,88 @@ function MaintenanceItem({
       <strong>{value}</strong>
       <small>{detail}</small>
     </div>
+  );
+}
+
+function CalendarPanel({
+  month,
+  days,
+  loading,
+  error,
+  timezone,
+  onPrevious,
+  onNext,
+  onToday,
+}: {
+  month: string;
+  days: CalendarDay[];
+  loading: boolean;
+  error: string | null;
+  timezone: string;
+  onPrevious: () => void;
+  onNext: () => void;
+  onToday: () => void;
+}) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const firstDay = new Date(year, monthNumber - 1, 1);
+  const daysInMonth = new Date(year, monthNumber, 0).getDate();
+  const mondayOffset = (firstDay.getDay() + 6) % 7;
+  const dayByDate = new Map(days.map((day) => [day.operationalDate, day]));
+  const cells = Array.from(
+    { length: Math.ceil((mondayOffset + daysInMonth) / 7) * 7 },
+    (_, index) => index - mondayOffset + 1,
+  );
+  const displayMonth = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "long",
+  }).format(new Date(year, monthNumber - 1, 1));
+
+  return (
+    <section className="panel calendar-panel" aria-label="Daily collection calendar">
+      <div className="calendar-header">
+        <div>
+          <p className="eyebrow">DAILY HISTORY</p>
+          <h2>Daily collection status</h2>
+          <span>Historical operating-day records · Europe/Amsterdam day boundary 04:00</span>
+        </div>
+        <div className="calendar-controls">
+          <button type="button" onClick={onPrevious} aria-label="Previous month">‹</button>
+          <strong>{displayMonth}</strong>
+          <button type="button" onClick={onNext} aria-label="Next month">›</button>
+          <button type="button" className="calendar-today" onClick={onToday}>Today</button>
+        </div>
+      </div>
+      {error && <div className="calendar-note">Daily history is temporarily unavailable: {error}</div>}
+      <div className="calendar-weekdays" aria-hidden="true">
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((weekday) => <span key={weekday}>{weekday}</span>)}
+      </div>
+      <div className={`calendar-grid ${loading ? "calendar-loading" : ""}`}>
+        {cells.map((dayNumber, index) => {
+          if (dayNumber < 1 || dayNumber > daysInMonth) {
+            return <span className="calendar-cell calendar-cell-empty" key={`empty-${index}`} />;
+          }
+          const date = `${month}-${String(dayNumber).padStart(2, "0")}`;
+          const day = dayByDate.get(date);
+          const status = day?.healthStatus ?? "no_data";
+          const completion = day?.completionRate == null ? "—" : percent.format(day.completionRate);
+          const label = day
+            ? `${date}: ${calendarStatusLabel(status)}, ${completion} completion, ${integer.format(day.received)} API items, ${integer.format(day.failedRuns)} failed requests`
+            : `${date}: No daily summary`;
+          return (
+            <div className={`calendar-cell calendar-day calendar-${status}`} key={date} title={label}>
+              <div className="calendar-day-top"><strong>{dayNumber}</strong>{day && <i aria-label={calendarStatusLabel(status)} />}</div>
+              <span>{day ? calendarStatusLabel(status) : "No data"}</span>
+              {day && <small>{completion} · {integer.format(day.received)} items</small>}
+            </div>
+          );
+        })}
+      </div>
+      <div className="calendar-legend" aria-label="Calendar status legend">
+        {(["healthy", "warning", "critical", "no_data"] as HealthStatus[]).map((status) => (
+          <span key={status}><i className={`calendar-dot calendar-dot-${status}`} />{calendarStatusLabel(status)}</span>
+        ))}
+      </div>
+    </section>
   );
 }

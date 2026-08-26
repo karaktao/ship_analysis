@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sqlite3
+import time
 
 from .compaction import _parse_datetime, operational_date_for
 from .config import AppConfig
@@ -43,7 +44,13 @@ class StagingRetention:
         *,
         dry_run: bool = False,
         now_utc: datetime | None = None,
+        max_runs: int | None = None,
+        batch_pause_seconds: float = 0.0,
     ) -> RetentionOutcome:
+        if max_runs is not None and max_runs < 1:
+            raise ValueError("max_runs must be at least 1")
+        if batch_pause_seconds < 0:
+            raise ValueError("batch_pause_seconds cannot be negative")
         now = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
         if not self.settings.enabled:
             return RetentionOutcome(
@@ -60,20 +67,22 @@ class StagingRetention:
                 dry_run=dry_run,
             )
 
-        self.storage.initialize()
+        # The collector/maintenance startup owns schema initialization. A
+        # frequent bounded retention pass must never run migrations or index
+        # creation against the live database before doing its small batch.
         with self.storage.connect() as connection:
             completed_days = {
-                row[0]
+                str(row[0])
                 for row in connection.execute(
                     """
-                    SELECT operational_date
+                    SELECT operational_date, output_path
                     FROM daily_compaction_runs
                     WHERE status = 'completed'
                     """
                 )
+                if self._valid_compacted_output(row[1])
             }
-            rows = connection.execute(
-                """
+            run_query = """
                 SELECT run_id, started_at_utc, snapshot_path,
                        raw_deleted_at_utc, details_deleted_at_utc
                 FROM collection_runs
@@ -86,8 +95,12 @@ class StagingRetention:
                       )
                   )
                 ORDER BY started_at_utc
-                """
-            ).fetchall()
+            """
+            parameters: tuple[int, ...] = ()
+            if max_runs is not None:
+                run_query += " LIMIT ?"
+                parameters = (max_runs,)
+            rows = connection.execute(run_query, parameters).fetchall()
 
         eligible_rows: list[sqlite3.Row] = []
         skipped_uncompacted = 0
@@ -167,21 +180,29 @@ class StagingRetention:
             if len(raw_updates) >= 1_000:
                 self._record_raw_updates(raw_updates)
                 raw_updates.clear()
+                self._pause(batch_pause_seconds)
 
         if raw_updates:
             self._record_raw_updates(raw_updates)
 
         if detail_run_ids and not dry_run:
             links_deleted, observations_deleted = self._delete_staging(
-                detail_run_ids
+                detail_run_ids,
+                batch_pause_seconds=batch_pause_seconds,
             )
 
         run_history_deleted = 0
         checkpoint_busy = 0
         if not dry_run:
             history_cutoff = now - timedelta(days=self.settings.run_detail_days)
-            run_history_deleted = self._purge_run_history(history_cutoff)
-            checkpoint_busy, _, _ = self.storage.checkpoint(truncate=True)
+            run_history_deleted = self._purge_run_history(
+                history_cutoff,
+                max_rows=max_runs,
+                batch_pause_seconds=batch_pause_seconds,
+            )
+            # PASSIVE never waits for live collector writers. The collector's
+            # WAL autocheckpoint handles truncation when it can do so safely.
+            checkpoint_busy, _, _ = self.storage.checkpoint(truncate=False)
 
         return RetentionOutcome(
             completed_operational_days=len(completed_days),
@@ -201,6 +222,26 @@ class StagingRetention:
             run_history_deleted=run_history_deleted,
             wal_checkpoint_busy=checkpoint_busy,
         )
+
+    def _valid_compacted_output(self, output_path: object) -> bool:
+        if not output_path:
+            return False
+        compacted_root = (self.config.data_dir / "compacted").resolve()
+        path = Path(str(output_path)).resolve()
+        try:
+            return (
+                path.is_relative_to(compacted_root)
+                and path.name.endswith(".json.gz")
+                and path.is_file()
+                and path.stat().st_size > 0
+            )
+        except OSError:
+            return False
+
+    @staticmethod
+    def _pause(seconds: float) -> None:
+        if seconds > 0:
+            time.sleep(seconds)
 
     def _record_raw_updates(
         self, values: list[tuple[str, str, str]]
@@ -223,8 +264,8 @@ class StagingRetention:
             links = connection.execute(
                 """
                 SELECT COUNT(*)
-                FROM collection_observations co
-                JOIN retention_runs rr ON rr.run_id = co.run_id
+                FROM collection_observations
+                WHERE run_id IN (SELECT run_id FROM retention_runs)
                 """
             ).fetchone()[0]
             observations = connection.execute(
@@ -242,8 +283,15 @@ class StagingRetention:
             ).fetchone()[0]
         return int(links), int(observations)
 
-    def _delete_staging(self, run_ids: list[str]) -> tuple[int, int]:
-        batch_size = self.settings.delete_batch_size
+    def _delete_staging(
+        self,
+        run_ids: list[str],
+        *,
+        batch_pause_seconds: float = 0.0,
+    ) -> tuple[int, int]:
+        # Keep transactions small even when the configured cleanup batch is
+        # large; this limits the time the collector can wait on SQLite writes.
+        batch_size = min(self.settings.delete_batch_size, 1_000)
         links_deleted = 0
         observations_deleted = 0
         with self.storage.connect() as connection:
@@ -256,8 +304,10 @@ class StagingRetention:
                     DELETE FROM collection_observations
                     WHERE rowid IN (
                         SELECT co.rowid
-                        FROM collection_observations co
-                        JOIN retention_runs rr ON rr.run_id = co.run_id
+                        FROM retention_runs rr
+                        CROSS JOIN collection_observations co
+                            INDEXED BY sqlite_autoindex_collection_observations_1
+                        WHERE co.run_id = rr.run_id
                         LIMIT ?
                     )
                     """,
@@ -270,6 +320,7 @@ class StagingRetention:
                 connection.commit()
                 if changed < batch_size:
                     break
+                self._pause(batch_pause_seconds)
 
             while True:
                 connection.execute(
@@ -295,6 +346,7 @@ class StagingRetention:
                 connection.commit()
                 if changed < batch_size:
                     break
+                self._pause(batch_pause_seconds)
 
             connection.execute(
                 """
@@ -307,12 +359,25 @@ class StagingRetention:
             )
         return links_deleted, observations_deleted
 
-    def _purge_run_history(self, cutoff: datetime) -> int:
+    def _purge_run_history(
+        self,
+        cutoff: datetime,
+        *,
+        max_rows: int | None = None,
+        batch_pause_seconds: float = 0.0,
+    ) -> int:
         deleted = 0
         cutoff_text = cutoff.isoformat(timespec="milliseconds")
-        batch_size = self.settings.delete_batch_size
+        batch_size = min(self.settings.delete_batch_size, 1_000)
         with self.storage.connect() as connection:
             while True:
+                if max_rows is not None and deleted >= max_rows:
+                    break
+                current_batch_size = batch_size
+                if max_rows is not None:
+                    current_batch_size = min(
+                        current_batch_size, max_rows - deleted
+                    )
                 connection.execute(
                     """
                     DELETE FROM collection_runs
@@ -334,15 +399,16 @@ class StagingRetention:
                         LIMIT ?
                     )
                     """,
-                    (cutoff_text, batch_size),
+                    (cutoff_text, current_batch_size),
                 )
                 changed = int(
                     connection.execute("SELECT changes()").fetchone()[0]
                 )
                 deleted += changed
                 connection.commit()
-                if changed < batch_size:
+                if changed < current_batch_size:
                     break
+                self._pause(batch_pause_seconds)
         return deleted
 
     @staticmethod
@@ -370,7 +436,7 @@ class StagingRetention:
             INSERT INTO retention_observations (observation_id)
             SELECT DISTINCT co.observation_id
             FROM collection_observations co
-            JOIN retention_runs rr ON rr.run_id = co.run_id
+            WHERE co.run_id IN (SELECT run_id FROM retention_runs)
             """
         )
 

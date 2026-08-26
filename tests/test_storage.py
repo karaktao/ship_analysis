@@ -3,6 +3,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from ship_analysis.config import BBox, CollectionTarget
 from ship_analysis.providers import FetchResult
@@ -10,6 +11,14 @@ from ship_analysis.storage import Storage
 
 
 class StorageTests(unittest.TestCase):
+    def test_initialize_can_skip_historical_bbox_backfill(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            storage = Storage(root / "test.db", root / "raw")
+            with patch.object(Storage, "_backfill_bbox_flags") as backfill:
+                storage.initialize(backfill_bbox_flags=False)
+            backfill.assert_not_called()
+
     def test_initialize_migrates_daily_summary_health_check(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

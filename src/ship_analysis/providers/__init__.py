@@ -1,4 +1,3 @@
-from .euris import EurisClient, FetchError, FetchResult
+from .euris import EurisClient, FetchError, FetchResult, ProviderUnavailable
 
-__all__ = ["EurisClient", "FetchError", "FetchResult"]
-
+__all__ = ["EurisClient", "FetchError", "FetchResult", "ProviderUnavailable"]

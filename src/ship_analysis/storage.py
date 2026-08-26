@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
 import gzip
 import json
 import os
@@ -203,6 +204,8 @@ CREATE INDEX IF NOT EXISTS idx_observations_position_time
     ON observations (position_time_utc);
 CREATE INDEX IF NOT EXISTS idx_observations_lat_lon
     ON observations (lat, lon);
+CREATE INDEX IF NOT EXISTS idx_collection_observations_observation_id
+    ON collection_observations (observation_id);
 CREATE INDEX IF NOT EXISTS idx_runs_area_started
     ON collection_runs (area_id, started_at_utc);
 CREATE INDEX IF NOT EXISTS idx_daily_records_track_time
@@ -243,12 +246,13 @@ class Storage:
         finally:
             connection.close()
 
-    def initialize(self) -> None:
+    def initialize(self, *, backfill_bbox_flags: bool = True) -> None:
         with self.connect() as connection:
             connection.executescript(SCHEMA)
             self._ensure_columns(connection)
             self._ensure_daily_summary_health_values(connection)
-            self._backfill_bbox_flags(connection)
+            if backfill_bbox_flags:
+                self._backfill_bbox_flags(connection)
 
     @staticmethod
     def _ensure_daily_summary_health_values(
@@ -412,6 +416,31 @@ class Storage:
                 """,
                 (utc_now_iso(), error[:4000], run_id),
             )
+
+    def recover_stale_runs(self, max_age_seconds: int = 900) -> int:
+        """Mark abandoned in-flight runs as failed after a safe grace period."""
+        if max_age_seconds < 1:
+            raise ValueError("max_age_seconds must be positive")
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+        ).isoformat(timespec="milliseconds")
+        now = utc_now_iso()
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE collection_runs
+                SET completed_at_utc = ?,
+                    status = 'failed',
+                    error = CASE
+                        WHEN error IS NULL OR error = ''
+                        THEN 'Recovered stale running record after process restart'
+                        ELSE error
+                    END
+                WHERE status = 'running' AND started_at_utc < ?
+                """,
+                (now, cutoff),
+            )
+            return int(cursor.rowcount)
 
     def write_snapshot(
         self,

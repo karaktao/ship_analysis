@@ -50,6 +50,9 @@ class ProviderConfig:
     max_pages: int
     request_gap_seconds: float
     user_agent: str
+    request_budget_seconds: float = 45.0
+    circuit_failure_threshold: int = 8
+    circuit_cooldown_seconds: float = 60.0
 
     @property
     def token(self) -> str | None:
@@ -212,6 +215,30 @@ def load_config(path: str | Path = "config/regions.toml") -> AppConfig:
     if delete_batch_size < 1_000:
         raise ValueError("retention.delete_batch_size must be at least 1000")
 
+    timeout_seconds = float(provider.get("timeout_seconds", 60))
+    max_retries = int(provider.get("max_retries", 4))
+    request_budget_seconds = float(
+        provider.get("request_budget_seconds", 45)
+    )
+    circuit_failure_threshold = int(
+        provider.get("circuit_failure_threshold", 8)
+    )
+    circuit_cooldown_seconds = float(
+        provider.get("circuit_cooldown_seconds", 60)
+    )
+    if timeout_seconds <= 0:
+        raise ValueError("provider.timeout_seconds must be positive")
+    if max_retries < 0:
+        raise ValueError("provider.max_retries cannot be negative")
+    if request_budget_seconds <= 0:
+        raise ValueError("provider.request_budget_seconds must be positive")
+    if circuit_failure_threshold < 1:
+        raise ValueError(
+            "provider.circuit_failure_threshold must be at least 1"
+        )
+    if circuit_cooldown_seconds <= 0:
+        raise ValueError("provider.circuit_cooldown_seconds must be positive")
+
     return AppConfig(
         config_path=config_path,
         project_root=project_root,
@@ -222,11 +249,14 @@ def load_config(path: str | Path = "config/regions.toml") -> AppConfig:
             name=str(provider["name"]),
             base_url=str(provider["base_url"]),
             token_env=str(provider.get("token_env", "EURIS_API_TOKEN")),
-            timeout_seconds=float(provider.get("timeout_seconds", 60)),
-            max_retries=int(provider.get("max_retries", 4)),
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
             max_pages=int(provider.get("max_pages", 200)),
             request_gap_seconds=float(provider.get("request_gap_seconds", 0.25)),
             user_agent=str(provider.get("user_agent", "ship-analysis/0.1")),
+            request_budget_seconds=request_budget_seconds,
+            circuit_failure_threshold=circuit_failure_threshold,
+            circuit_cooldown_seconds=circuit_cooldown_seconds,
         ),
         compaction=CompactionConfig(
             enabled=bool(compaction.get("enabled", True)),

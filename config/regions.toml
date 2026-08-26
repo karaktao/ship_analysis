@@ -7,8 +7,13 @@ raw_dir = "data/raw"
 name = "euris_v2"
 base_url = "https://www.eurisportal.eu/visuris/api/TracksV2/GetTracksByBBoxV2"
 token_env = "EURIS_API_TOKEN"
-timeout_seconds = 60
-max_retries = 4
+# Bound one socket wait and the complete multi-page bbox fetch separately.
+timeout_seconds = 25
+max_retries = 2
+request_budget_seconds = 45
+# Stop hammering a degraded provider after repeated transient failures.
+circuit_failure_threshold = 8
+circuit_cooldown_seconds = 60
 max_pages = 200
 request_gap_seconds = 0.35
 user_agent = "ship-analysis/0.1 (EuRIS research collector)"
@@ -58,6 +63,7 @@ interval_seconds = 60
 grid_columns = 8
 grid_rows = 6
 start_delay_seconds = 0
-stagger_seconds = 0
+# Spread 48 first requests across seconds 0..47; cadence remains 60 seconds.
+stagger_seconds = 1
 priority = 10
 enabled = true

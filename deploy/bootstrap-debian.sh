@@ -89,6 +89,12 @@ runuser -u "${service_user}" -- \
 
 install -m 0644 "${app_dir}/deploy/systemd/ship-analysis-collector.service" \
   /etc/systemd/system/ship-analysis-collector.service
+install -m 0644 "${app_dir}/deploy/systemd/ship-analysis-maintenance.service" \
+  /etc/systemd/system/ship-analysis-maintenance.service
+install -m 0644 "${app_dir}/deploy/systemd/ship-analysis-retention.service" \
+  /etc/systemd/system/ship-analysis-retention.service
+install -m 0644 "${app_dir}/deploy/systemd/ship-analysis-retention.timer" \
+  /etc/systemd/system/ship-analysis-retention.timer
 install -m 0644 "${app_dir}/deploy/systemd/ship-analysis-dashboard-api.service" \
   /etc/systemd/system/ship-analysis-dashboard-api.service
 install -m 0644 "${app_dir}/deploy/systemd/ship-analysis-dashboard-web.service" \
@@ -102,11 +108,15 @@ ln -sfn /etc/nginx/sites-available/ship-analysis.conf \
 rm -f /etc/nginx/sites-enabled/default
 
 nginx -t
+bash "${app_dir}/deploy/ensure-swap.sh"
 systemctl daemon-reload
 systemctl enable ship-analysis-collector.service
+systemctl enable ship-analysis-maintenance.service
+systemctl enable --now ship-analysis-retention.timer
 systemctl enable ship-analysis-dashboard-api.service
 systemctl enable ship-analysis-dashboard-web.service
 systemctl restart ship-analysis-collector.service
+systemctl restart ship-analysis-maintenance.service
 systemctl restart ship-analysis-dashboard-api.service
 systemctl restart ship-analysis-dashboard-web.service
 systemctl enable nginx.service

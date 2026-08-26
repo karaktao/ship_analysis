@@ -1,0 +1,35 @@
+[Unit]
+Description=Ship Analysis bounded staging retention pass
+After=ship-analysis-collector.service ship-analysis-maintenance.service
+ConditionPathExists=/opt/ship_analysis/app/data/ship_analysis.db
+
+[Service]
+Type=oneshot
+User=shipanalysis
+Group=shipanalysis
+WorkingDirectory=/opt/ship_analysis/app
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ship_analysis/app/.venv/bin/ship-analysis --config /opt/ship_analysis/app/config/regions.toml prune-staging --apply --max-runs 2000 --batch-pause-seconds 0.05
+
+# Retention must always yield CPU and disk service to the live collector.
+Nice=19
+CPUWeight=10
+CPUQuota=15%
+IOSchedulingClass=idle
+IOSchedulingPriority=7
+IOWeight=10
+MemoryMax=768M
+MemorySwapMax=1G
+TimeoutStartSec=30min
+TimeoutStopSec=30s
+
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ship_analysis/app/data
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
