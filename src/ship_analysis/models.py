@@ -113,6 +113,11 @@ def normalize_observation(
     observation_key = hashlib.sha256(
         json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
+    # The complete provider response already lives in the compressed source
+    # snapshot for at least 24 hours. Keeping another full JSON object in every
+    # SQLite row creates substantial write amplification. Retain it only when
+    # it is required to identify an otherwise anonymous observation.
+    stored_raw_json = raw_json if track_id is None and position_time is None else ""
 
     return NormalizedObservation(
         observation_key=observation_key,
@@ -141,6 +146,5 @@ def normalize_observation(
         isrs_name=_text(_first(record, "positionISRSName", "isrsPositionName")),
         direction=_number(_first(record, "direction"), int),
         privacy_class=_number(_first(record, "privacyClass"), int),
-        raw_json=raw_json,
+        raw_json=stored_raw_json,
     )
-

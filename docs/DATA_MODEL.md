@@ -71,8 +71,13 @@ of a raw snapshot. `details_deleted_at_utc` and `details_retention_reason`
 record cleanup of normalized provenance. The original `snapshot_path` is
 retained for audit. Cleanup only accepts `.json.gz` paths resolved below the
 configured raw directory and requires a completed `daily_compaction_runs` row
-for the matching operational day. An observation shared with an uncleaned day
-is retained until its final provenance link is removed.
+for the matching operational day. Raw files are never removed before they are
+24 hours old. Normalized links and observations are deleted in bounded
+transactions; a checkpoint truncates the SQLite WAL after cleanup. An
+observation shared with an uncleaned day is retained until its final provenance
+link is removed. Eligible per-grid `collection_runs` detail is retained for
+14 days, after which the materialized period statistics and daily summaries
+are the durable audit interface.
 
 ### `daily_track_records`
 
@@ -87,8 +92,8 @@ The derived daily trajectory layer has two record types:
 A stationary record keeps its start/end time, centroid, start/end coordinates,
 duration, source sample count, distinct observation count, maximum radius and
 latest available vessel metadata. It does not contain `raw_json`; source
-records remain available through the immutable raw snapshot and normalized
-tables.
+records remain available in raw gzip for at least 24 hours. The daily gzip and
+`daily_track_records` are the durable normalized research layer.
 
 ### `collection_period_stats`
 
@@ -107,8 +112,10 @@ be exactly recomputed from cleaned provenance.
 
 One deterministic health summary per operational day. It stores the exact UTC
 bounds, health status, human-readable findings, the complete JSON payload and
-the output-file path. The JSON includes per-provider/channel totals, coverage,
-peak minute/hour, collection quality signals and daily compaction status.
+the output-file path. `partial` distinguishes the first incomplete operating
+day and explicitly requested pre-close reports from collection failures. Page
+count changes are monitored by rate; ordinary within-page duplicates remain a
+quality signal but do not directly mark the day unhealthy.
 
 ## Semantic cautions
 
@@ -123,4 +130,7 @@ peak minute/hour, collection quality signals and daily compaction status.
 - `mmsi`, `eni`, vessel type and other identity fields may be absent, masked,
   zero or `-1` because of privacy and source availability. Do not infer vessel
   type from those sentinel values.
-- Every normalized row retains the complete provider object in `raw_json`.
+- A normal identified observation stores normalized fields and an empty
+  `raw_json` value to avoid duplicating the compressed source snapshot. The
+  complete provider object is retained only for otherwise anonymous rows that
+  require it to form a stable observation key.

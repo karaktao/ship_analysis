@@ -1,0 +1,30 @@
+[Unit]
+Description=Ship Analysis reporting and compaction worker
+Wants=network-online.target
+After=network-online.target ship-analysis-collector.service
+
+[Service]
+Type=simple
+User=shipanalysis
+Group=shipanalysis
+WorkingDirectory=/opt/ship_analysis/app
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/ship-analysis/collector.env
+ExecStart=/opt/ship_analysis/app/.venv/bin/ship-analysis --config /opt/ship_analysis/app/config/regions.toml maintenance --interval-seconds 60
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=60
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ship_analysis/app/data
+RestrictAddressFamilies=AF_UNIX
+# Keep a compaction regression from taking down the collector or the VPS.
+MemoryMax=3G
+MemorySwapMax=4G
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

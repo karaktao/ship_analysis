@@ -1,17 +1,14 @@
 from __future__ import annotations
 
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date
 import heapq
 import logging
 import threading
 import time
 
-from .compaction import DailyCompactor
 from .config import AppConfig, CollectionTarget
-from .providers import EurisClient
-from .reporting import CollectionReporter
-from .retention import StagingRetention
+from .providers import EurisClient, ProviderUnavailable
 from .storage import Storage
 
 
@@ -38,90 +35,57 @@ class Collector:
         self.config = config
         self.provider = EurisClient(config.provider)
         self.storage = Storage(config.database, config.raw_dir)
-        self.storage.initialize()
-        self.compactor = DailyCompactor(config, self.storage)
-        self.reporter = CollectionReporter(config, self.storage)
-        self.retention = StagingRetention(config, self.storage)
-        self._compaction_stop = threading.Event()
+        # SQLite permits one writer at a time. Fetches may run concurrently,
+        # while the larger observation-ingest transaction stays serialized
+        # inside this collector process to avoid lock contention and retries.
+        self._ingest_lock = threading.Lock()
+        # Historical bbox-flag backfill can scan the full provenance table.
+        # The live collector only needs schema checks; maintenance owns heavy
+        # historical work so restarts return to polling promptly.
+        self.storage.initialize(backfill_bbox_flags=False)
+        # A restart after an OOM or host maintenance can leave a run in the
+        # audit table as ``running``. These rows are not active requests and
+        # should not pollute schedule-completion metrics.
+        recovered = self.storage.recover_stale_runs()
+        if recovered:
+            LOGGER.warning("recovered-stale-runs count=%d", recovered)
 
-    def _run_compaction_worker(self) -> None:
-        next_retention_check = 0.0
-        while not self._compaction_stop.is_set():
-            outcomes = []
-            try:
-                self.reporter.refresh()
-            except Exception:
-                LOGGER.exception("collection-reporting-refresh-failed")
-            try:
-                outcomes = self.compactor.compact_pending()
-                for outcome in outcomes:
-                    LOGGER.info(
-                        "daily-compaction-ok day=%s samples=%d records=%d "
-                        "stationary=%d collapsed_samples=%d output=%s",
-                        outcome.operational_date,
-                        outcome.source_samples,
-                        outcome.output_records,
-                        outcome.stationary_records,
-                        outcome.stationary_source_samples,
-                        outcome.output_path,
-                    )
-            except Exception:
-                LOGGER.exception("daily-compaction-failed")
-            try:
-                if outcomes:
-                    for outcome in outcomes:
-                        self.reporter.generate_daily_summary(
-                            date.fromisoformat(outcome.operational_date),
-                            force=True,
-                        )
-                else:
-                    self.reporter.generate_latest_ready_summary()
-            except Exception:
-                LOGGER.exception("daily-collection-summary-failed")
-            if outcomes or time.monotonic() >= next_retention_check:
-                try:
-                    retention = self.retention.prune()
-                    if retention.candidate_runs or retention.skipped_uncompacted:
-                        LOGGER.info(
-                            "staging-retention-ok through=%s runs=%d raw=%d "
-                            "links=%d observations=%d uncompacted=%d unsafe=%d "
-                            "bytes=%d",
-                            retention.eligible_through_operational_date,
-                            retention.candidate_runs,
-                            retention.raw_deleted,
-                            retention.provenance_links_deleted,
-                            retention.observations_deleted,
-                            retention.skipped_uncompacted,
-                            retention.skipped_unsafe_path,
-                            retention.bytes_deleted,
-                        )
-                except Exception:
-                    LOGGER.exception("staging-retention-failed")
-                next_retention_check = time.monotonic() + (
-                    self.config.retention.cleanup_interval_hours * 3600
-                )
-            self._compaction_stop.wait(60)
-
-    def collect(self, target: CollectionTarget) -> CollectionOutcome:
+    def collect(
+        self,
+        target: CollectionTarget,
+        *,
+        scheduler_lag_seconds: float = 0.0,
+    ) -> CollectionOutcome:
         run_id = self.storage.start_run(self.config.provider.name, target)
         LOGGER.info(
-            "fetch-start run=%s target=%s bbox=%s",
+            "fetch-start run=%s target=%s bbox=%s scheduler_lag=%.2fs",
             run_id,
             target.id,
             target.bbox.compact(),
+            scheduler_lag_seconds,
         )
         try:
             result = self.provider.fetch_bbox(target.bbox)
             snapshot_path = self.storage.write_snapshot(
                 self.config.provider.name, target, run_id, result
             )
-            inserted, existing, within_run_duplicates = self.storage.ingest(
+            with self._ingest_lock:
+                inserted, existing, within_run_duplicates = self.storage.ingest(
+                    run_id,
+                    self.config.provider.name,
+                    target,
+                    result,
+                    snapshot_path,
+                )
+        except ProviderUnavailable as error:
+            self.storage.fail_run(run_id, f"{type(error).__name__}: {error}")
+            LOGGER.warning(
+                "fetch-skipped run=%s target=%s reason=%s",
                 run_id,
-                self.config.provider.name,
-                target,
-                result,
-                snapshot_path,
+                target.id,
+                error,
             )
+            raise
         except Exception as error:
             self.storage.fail_run(run_id, f"{type(error).__name__}: {error}")
             LOGGER.exception("fetch-failed run=%s target=%s", run_id, target.id)
@@ -142,7 +106,8 @@ class Collector:
         )
         LOGGER.info(
             "fetch-ok run=%s target=%s items=%d unique=%d inserted=%d "
-            "existing=%d page_duplicates=%d count_delta=%s pages=%d elapsed=%.2fs",
+            "existing=%d page_duplicates=%d count_delta=%s pages=%d retries=%d "
+            "elapsed=%.2fs",
             run_id,
             target.id,
             outcome.items,
@@ -152,9 +117,43 @@ class Collector:
             outcome.within_run_duplicates,
             outcome.reported_count_delta,
             outcome.pages,
+            result.retry_count,
             outcome.elapsed_seconds,
         )
         return outcome
+
+    def _dispatch_target(
+        self,
+        executor: ThreadPoolExecutor,
+        in_flight: dict[str, Future[CollectionOutcome]],
+        target: CollectionTarget,
+        *,
+        scheduler_lag_seconds: float,
+    ) -> str:
+        if target.id in in_flight:
+            return "target-still-running"
+        if len(in_flight) >= self.config.collection_workers:
+            return "worker-pool-full"
+        in_flight[target.id] = executor.submit(
+            self.collect,
+            target,
+            scheduler_lag_seconds=scheduler_lag_seconds,
+        )
+        return "submitted"
+
+    @staticmethod
+    def _reap_completed(
+        in_flight: dict[str, Future[CollectionOutcome]],
+    ) -> None:
+        for target_id, future in tuple(in_flight.items()):
+            if not future.done():
+                continue
+            try:
+                future.result()
+            except Exception:
+                # collect() already records the failed run and full exception.
+                pass
+            del in_flight[target_id]
 
     def run_forever(self) -> None:
         targets = self.config.targets()
@@ -174,18 +173,22 @@ class Collector:
                 ),
             )
 
-        compaction_thread = threading.Thread(
-            target=self._run_compaction_worker,
-            name="collection-maintenance",
-            daemon=True,
+        in_flight: dict[str, Future[CollectionOutcome]] = {}
+        LOGGER.info(
+            "scheduler-started targets=%d workers=%d",
+            len(queue),
+            self.config.collection_workers,
         )
-        compaction_thread.start()
-
-        LOGGER.info("scheduler-started targets=%d", len(queue))
+        executor = ThreadPoolExecutor(
+            max_workers=self.config.collection_workers,
+            thread_name_prefix="euris-collector",
+        )
         try:
             while True:
+                self._reap_completed(in_flight)
                 due_at, negative_priority, target_id, target = heapq.heappop(queue)
-                wait = due_at - time.monotonic()
+                now = time.monotonic()
+                wait = due_at - now
                 if wait > 0:
                     time.sleep(min(wait, self.config.idle_sleep_seconds))
                     heapq.heappush(
@@ -193,20 +196,37 @@ class Collector:
                     )
                     continue
 
-                try:
-                    self.collect(target)
-                except Exception:
-                    # The failed run is already persisted; keep other areas alive.
-                    pass
-                finally:
-                    next_due = max(
-                        due_at + target.interval_seconds,
-                        time.monotonic() + 0.01,
+                scheduler_lag = max(0.0, now - due_at)
+                dispatch = self._dispatch_target(
+                    executor,
+                    in_flight,
+                    target,
+                    scheduler_lag_seconds=scheduler_lag,
+                )
+                if dispatch != "submitted":
+                    LOGGER.warning(
+                        "schedule-skipped target=%s reason=%s "
+                        "in_flight=%d workers=%d scheduler_lag=%.2fs",
+                        target.id,
+                        dispatch,
+                        len(in_flight),
+                        self.config.collection_workers,
+                        scheduler_lag,
                     )
-                    heapq.heappush(
-                        queue,
-                        (next_due, negative_priority, target_id, target),
-                    )
+
+                # Keep each tile aligned to its original cadence. If the
+                # scheduler itself was paused, advance directly to the first
+                # future slot instead of creating a catch-up request burst.
+                intervals_elapsed = int(scheduler_lag // target.interval_seconds)
+                next_due = due_at + (
+                    intervals_elapsed + 1
+                ) * target.interval_seconds
+                heapq.heappush(
+                    queue,
+                    (next_due, negative_priority, target_id, target),
+                )
         finally:
-            self._compaction_stop.set()
-            compaction_thread.join(timeout=1)
+            LOGGER.info(
+                "scheduler-stopping in_flight=%d", len(in_flight)
+            )
+            executor.shutdown(wait=False, cancel_futures=True)

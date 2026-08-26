@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { Dashboard } from "./Dashboard";
 
 export const metadata: Metadata = {
-  title: "Netherlands AIS Pulse",
+  title: "AIS Collection Health",
   description:
-    "National AIS minute, hourly and operating-day collection monitoring.",
+    "Lightweight AIS collection volume, storage and anomaly monitoring.",
 };
 
 export default function Home() {

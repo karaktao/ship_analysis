@@ -7,14 +7,22 @@ raw_dir = "data/raw"
 name = "euris_v2"
 base_url = "https://www.eurisportal.eu/visuris/api/TracksV2/GetTracksByBBoxV2"
 token_env = "EURIS_API_TOKEN"
-timeout_seconds = 60
-max_retries = 4
+# Bound one socket wait and the complete multi-page bbox fetch separately.
+timeout_seconds = 25
+max_retries = 2
+request_budget_seconds = 45
+# Stop hammering a degraded provider after repeated transient failures.
+circuit_failure_threshold = 8
+circuit_cooldown_seconds = 60
 max_pages = 200
 request_gap_seconds = 0.35
-user_agent = "ship-analysis/0.1 (EuRIS research collector)"
+user_agent = "ship-analysis/0.2.1 (EuRIS research collector)"
 
 [runner]
 idle_sleep_seconds = 1.0
+# Keep network work bounded: one slow tile occupies only one of four slots.
+# The scheduler never queues more work than this or overlaps the same tile.
+collection_workers = 4
 
 [compaction]
 enabled = true
@@ -31,9 +39,15 @@ stationary_max_gap_minutes = 5
 [retention]
 enabled = true
 cleanup_interval_hours = 24
-# Raw snapshots, normalized observations/raw_json and provenance links are
-# staging data. They are deleted by completed operational day, never before
-# that day's position/stationary compaction succeeds.
+# Keep every compressed source snapshot for at least 24 hours after collection.
+raw_min_age_hours = 24
+# Detailed per-grid request rows are useful for short-term diagnosis only.
+run_detail_days = 14
+# Bound each SQLite delete transaction to avoid a very large WAL burst.
+delete_batch_size = 25000
+# Raw snapshots, normalized observations and provenance links are staging
+# data. Details require completed daily compaction; raw gzip also requires
+# the configured minimum age.
 require_completed_compaction = true
 
 # Coverage interpretation:
@@ -52,6 +66,7 @@ interval_seconds = 60
 grid_columns = 8
 grid_rows = 6
 start_delay_seconds = 0
-stagger_seconds = 0
+# Spread 48 first requests across seconds 0..47; cadence remains 60 seconds.
+stagger_seconds = 1
 priority = 10
 enabled = true

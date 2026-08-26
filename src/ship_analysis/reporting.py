@@ -198,10 +198,8 @@ class CollectionReporter:
                     COALESCE(SUM(CASE WHEN status = 'completed'
                         THEN pages ELSE 0 END), 0) AS page_count,
                     COALESCE(SUM(CASE WHEN status = 'completed'
-                        AND (
-                            COALESCE(reported_count_delta, 0) <> 0
-                            OR COALESCE(within_run_duplicate_count, 0) > 0
-                        ) THEN 1 ELSE 0 END), 0)
+                        AND COALESCE(reported_count_delta, 0) <> 0
+                        THEN 1 ELSE 0 END), 0)
                         AS pagination_anomaly_run_count,
                     COALESCE(SUM(CASE WHEN status = 'completed'
                         THEN elapsed_seconds ELSE 0 END), 0)
@@ -533,6 +531,19 @@ class CollectionReporter:
         )
         peak_minute = self._peak_minute(start_utc, end_utc)
         with self.storage.connect() as connection:
+            first_run_at = connection.execute(
+                "SELECT MIN(started_at_utc) FROM collection_runs"
+            ).fetchone()[0]
+            earlier_summary_count = int(
+                connection.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM daily_collection_summaries
+                    WHERE operational_date < ?
+                    """,
+                    (day_key,),
+                ).fetchone()[0]
+            )
             active_minutes = int(
                 connection.execute(
                     """
@@ -578,8 +589,23 @@ class CollectionReporter:
         attempted = day_stats.completed_run_count + day_stats.failed_run_count
         completion_rate = day_stats.schedule_completion_rate
         success_rate = day_stats.request_success_rate
+        pagination_anomaly_rate = (
+            day_stats.pagination_anomaly_run_count
+            / day_stats.completed_run_count
+            if day_stats.completed_run_count
+            else 0.0
+        )
+        first_run = _parse_utc(first_run_at) if first_run_at else None
+        initial_partial_day = bool(
+            earlier_summary_count == 0
+            and first_run
+            and start_utc <= first_run < end_utc
+            and first_run > start_utc + timedelta(minutes=5)
+        )
         if day_stats.observed_run_count == 0:
             health = "no_data"
+        elif allow_incomplete or initial_partial_day:
+            health = "partial"
         elif (
             day_stats.completed_run_count == 0
             or completion_rate < 0.90
@@ -590,7 +616,7 @@ class CollectionReporter:
             completion_rate < 0.98
             or (attempted and success_rate < 0.99)
             or day_stats.failed_run_count > 0
-            or day_stats.pagination_anomaly_run_count > 0
+            or pagination_anomaly_rate > 0.05
             or day_stats.tiles_seen < day_stats.expected_target_count
         ):
             health = "warning"
@@ -620,10 +646,14 @@ class CollectionReporter:
         ]
         if missing_runs:
             findings.append(f"相对计划少完成 {missing_runs:,} 次请求。")
+        if health == "partial":
+            findings.append(
+                "这是首次启动或尚未结束的部分运营日，不作为采集故障判定。"
+            )
         if day_stats.pagination_anomaly_run_count:
             findings.append(
                 f"{day_stats.pagination_anomaly_run_count:,} 次请求出现"
-                "分页计数变化或页内重复，需要复核。"
+                "分页计数变化；页内重复单独统计，不直接视为故障。"
             )
         if not day_stats.details_complete:
             findings.append(
@@ -652,6 +682,7 @@ class CollectionReporter:
                 "missing_completed_runs": missing_runs,
                 "active_collection_minutes": active_minutes,
                 "expected_minutes": expected_minutes,
+                "is_partial": health == "partial",
             },
             "channels": [dict(row) for row in channel_rows],
             "peaks": {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
 import gzip
 import json
 import os
@@ -14,6 +15,9 @@ from uuid import uuid4
 from .config import BBox, CollectionTarget
 from .models import NormalizedObservation, normalize_observation, utc_now_iso
 from .providers import FetchResult
+
+
+WAL_JOURNAL_LIMIT_BYTES = 256 * 1024 * 1024
 
 
 SCHEMA = """
@@ -184,7 +188,11 @@ CREATE TABLE IF NOT EXISTS daily_collection_summaries (
     day_end_utc TEXT NOT NULL,
     generated_at_utc TEXT NOT NULL,
     health_status TEXT NOT NULL
-        CHECK (health_status IN ('healthy', 'warning', 'critical', 'no_data')),
+        CHECK (
+            health_status IN (
+                'healthy', 'warning', 'critical', 'partial', 'no_data'
+            )
+        ),
     summary_text TEXT NOT NULL,
     summary_json TEXT NOT NULL,
     output_path TEXT NOT NULL
@@ -196,6 +204,8 @@ CREATE INDEX IF NOT EXISTS idx_observations_position_time
     ON observations (position_time_utc);
 CREATE INDEX IF NOT EXISTS idx_observations_lat_lon
     ON observations (lat, lon);
+CREATE INDEX IF NOT EXISTS idx_collection_observations_observation_id
+    ON collection_observations (observation_id);
 CREATE INDEX IF NOT EXISTS idx_runs_area_started
     ON collection_runs (area_id, started_at_utc);
 CREATE INDEX IF NOT EXISTS idx_daily_records_track_time
@@ -204,6 +214,10 @@ CREATE INDEX IF NOT EXISTS idx_daily_records_type_date
     ON daily_track_records (record_type, operational_date);
 CREATE INDEX IF NOT EXISTS idx_period_stats_granularity_start
     ON collection_period_stats (granularity, period_start_utc);
+CREATE INDEX IF NOT EXISTS idx_runs_started
+    ON collection_runs (started_at_utc);
+CREATE INDEX IF NOT EXISTS idx_runs_raw_deleted
+    ON collection_runs (raw_deleted_at_utc);
 """
 
 
@@ -219,6 +233,10 @@ class Storage:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("PRAGMA synchronous=NORMAL")
+        connection.execute("PRAGMA busy_timeout=30000")
+        connection.execute("PRAGMA wal_autocheckpoint=1000")
+        connection.execute(f"PRAGMA journal_size_limit={WAL_JOURNAL_LIMIT_BYTES}")
         try:
             yield connection
             connection.commit()
@@ -228,11 +246,63 @@ class Storage:
         finally:
             connection.close()
 
-    def initialize(self) -> None:
+    def initialize(self, *, backfill_bbox_flags: bool = True) -> None:
         with self.connect() as connection:
             connection.executescript(SCHEMA)
             self._ensure_columns(connection)
-            self._backfill_bbox_flags(connection)
+            self._ensure_daily_summary_health_values(connection)
+            if backfill_bbox_flags:
+                self._backfill_bbox_flags(connection)
+
+    @staticmethod
+    def _ensure_daily_summary_health_values(
+        connection: sqlite3.Connection,
+    ) -> None:
+        row = connection.execute(
+            """
+            SELECT sql
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'daily_collection_summaries'
+            """
+        ).fetchone()
+        if row is None or "'partial'" in str(row["sql"]):
+            return
+        connection.execute(
+            "ALTER TABLE daily_collection_summaries RENAME TO daily_collection_summaries_old"
+        )
+        connection.execute(
+            """
+            CREATE TABLE daily_collection_summaries (
+                operational_date TEXT PRIMARY KEY,
+                timezone TEXT NOT NULL,
+                day_start_utc TEXT NOT NULL,
+                day_end_utc TEXT NOT NULL,
+                generated_at_utc TEXT NOT NULL,
+                health_status TEXT NOT NULL
+                    CHECK (
+                        health_status IN (
+                            'healthy', 'warning', 'critical', 'partial', 'no_data'
+                        )
+                    ),
+                summary_text TEXT NOT NULL,
+                summary_json TEXT NOT NULL,
+                output_path TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO daily_collection_summaries
+            SELECT * FROM daily_collection_summaries_old
+            """
+        )
+        connection.execute("DROP TABLE daily_collection_summaries_old")
+
+    def checkpoint(self, *, truncate: bool = False) -> tuple[int, int, int]:
+        mode = "TRUNCATE" if truncate else "PASSIVE"
+        with self.connect() as connection:
+            row = connection.execute(f"PRAGMA wal_checkpoint({mode})").fetchone()
+        return int(row[0]), int(row[1]), int(row[2])
 
     @staticmethod
     def _ensure_columns(connection: sqlite3.Connection) -> None:
@@ -346,6 +416,31 @@ class Storage:
                 """,
                 (utc_now_iso(), error[:4000], run_id),
             )
+
+    def recover_stale_runs(self, max_age_seconds: int = 900) -> int:
+        """Mark abandoned in-flight runs as failed after a safe grace period."""
+        if max_age_seconds < 1:
+            raise ValueError("max_age_seconds must be positive")
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+        ).isoformat(timespec="milliseconds")
+        now = utc_now_iso()
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE collection_runs
+                SET completed_at_utc = ?,
+                    status = 'failed',
+                    error = CASE
+                        WHEN error IS NULL OR error = ''
+                        THEN 'Recovered stale running record after process restart'
+                        ELSE error
+                    END
+                WHERE status = 'running' AND started_at_utc < ?
+                """,
+                (now, cutoff),
+            )
+            return int(cursor.rowcount)
 
     def write_snapshot(
         self,

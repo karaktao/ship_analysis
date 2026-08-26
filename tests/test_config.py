@@ -30,12 +30,22 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(1, len(config.areas))
         self.assertEqual(48, len(config.targets()))
         self.assertTrue(all(target.interval_seconds == 60 for target in config.targets()))
-        self.assertTrue(
-            all(target.initial_delay_seconds == 0 for target in config.targets())
+        self.assertEqual(
+            list(range(48)),
+            [target.initial_delay_seconds for target in config.targets()],
         )
+        self.assertEqual(25, config.provider.timeout_seconds)
+        self.assertEqual(2, config.provider.max_retries)
+        self.assertEqual(45, config.provider.request_budget_seconds)
+        self.assertEqual(8, config.provider.circuit_failure_threshold)
+        self.assertEqual(60, config.provider.circuit_cooldown_seconds)
+        self.assertEqual(4, config.collection_workers)
         self.assertEqual("Europe/Amsterdam", config.compaction.timezone)
         self.assertEqual(4, config.compaction.day_boundary_hour)
         self.assertEqual(24, config.retention.cleanup_interval_hours)
+        self.assertEqual(24, config.retention.raw_min_age_hours)
+        self.assertEqual(14, config.retention.run_detail_days)
+        self.assertEqual(25_000, config.retention.delete_batch_size)
         self.assertTrue(config.retention.require_completed_compaction)
 
 

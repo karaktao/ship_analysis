@@ -11,8 +11,8 @@ export async function generateMetadata(): Promise<Metadata> {
       ? "http"
       : "https");
   const metadataBase = new URL(`${protocol}://${host ?? "localhost:3000"}`);
-  const title = "Netherlands AIS Pulse";
-  const description = "National AIS collection throughput, grid coverage and daily health summaries.";
+  const title = "AIS Collection Health";
+  const description = "Lightweight AIS collection volume, storage and anomaly monitoring.";
   const image = new URL("/og.png", metadataBase).toString();
   return {
     metadataBase,
